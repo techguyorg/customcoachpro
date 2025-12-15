@@ -1,0 +1,87 @@
+// API Configuration
+// Update this URL when deploying to Azure
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7001/api';
+
+export const API_ENDPOINTS = {
+  // Auth
+  auth: {
+    login: '/auth/login',
+    register: '/auth/register',
+    refresh: '/auth/refresh',
+    logout: '/auth/logout',
+    me: '/auth/me',
+  },
+  // Users
+  users: {
+    base: '/users',
+    byId: (id: string) => `/users/${id}`,
+  },
+  // Clients
+  clients: {
+    base: '/clients',
+    byId: (id: string) => `/clients/${id}`,
+    byCoach: (coachId: string) => `/clients/coach/${coachId}`,
+  },
+  // Check-ins
+  checkIns: {
+    weight: {
+      base: '/checkins/weight',
+      byId: (id: string) => `/checkins/weight/${id}`,
+      byClient: (clientId: string) => `/checkins/weight/client/${clientId}`,
+    },
+    photos: {
+      base: '/checkins/photos',
+      byId: (id: string) => `/checkins/photos/${id}`,
+      byClient: (clientId: string) => `/checkins/photos/client/${clientId}`,
+    },
+    workout: {
+      base: '/checkins/workout',
+      byId: (id: string) => `/checkins/workout/${id}`,
+      byClient: (clientId: string) => `/checkins/workout/client/${clientId}`,
+    },
+    diet: {
+      base: '/checkins/diet',
+      byId: (id: string) => `/checkins/diet/${id}`,
+      byClient: (clientId: string) => `/checkins/diet/client/${clientId}`,
+    },
+  },
+  // Exercises
+  exercises: {
+    base: '/exercises',
+    byId: (id: string) => `/exercises/${id}`,
+    byCoach: (coachId: string) => `/exercises/coach/${coachId}`,
+  },
+  // Workout Plans
+  workoutPlans: {
+    base: '/workout-plans',
+    byId: (id: string) => `/workout-plans/${id}`,
+    byCoach: (coachId: string) => `/workout-plans/coach/${coachId}`,
+    assign: '/workout-plans/assign',
+    clientPlans: (clientId: string) => `/workout-plans/client/${clientId}`,
+  },
+  // Foods
+  foods: {
+    base: '/foods',
+    byId: (id: string) => `/foods/${id}`,
+    byCoach: (coachId: string) => `/foods/coach/${coachId}`,
+  },
+  // Meals
+  meals: {
+    base: '/meals',
+    byId: (id: string) => `/meals/${id}`,
+    byCoach: (coachId: string) => `/meals/coach/${coachId}`,
+  },
+  // Diet Plans
+  dietPlans: {
+    base: '/diet-plans',
+    byId: (id: string) => `/diet-plans/${id}`,
+    byCoach: (coachId: string) => `/diet-plans/coach/${coachId}`,
+    assign: '/diet-plans/assign',
+    clientPlans: (clientId: string) => `/diet-plans/client/${clientId}`,
+  },
+  // Dashboard
+  dashboard: {
+    coach: '/dashboard/coach',
+    client: '/dashboard/client',
+  },
+} as const;
