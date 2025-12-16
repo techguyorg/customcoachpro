@@ -13,7 +13,7 @@ import { AuthLayout } from "@/components/layout/AuthLayout";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 
-// App Pages
+// Coach Pages
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 import { ClientsPage } from "@/pages/clients/ClientsPage";
 import { ClientDetailPage } from "@/pages/clients/ClientDetailPage";
@@ -22,6 +22,12 @@ import { CheckInsPage } from "@/pages/checkins/CheckInsPage";
 import { WorkoutPlansPage } from "@/pages/workouts/WorkoutPlansPage";
 import { DietPlansPage } from "@/pages/diet/DietPlansPage";
 import { AnalyticsPage } from "@/pages/analytics/AnalyticsPage";
+
+// Client Pages
+import { MyPlanPage } from "@/pages/client/MyPlanPage";
+import { CheckInPage } from "@/pages/client/CheckInPage";
+import { ProgressPage } from "@/pages/client/ProgressPage";
+
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,7 +79,10 @@ function AppRoutes() {
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+        {/* Shared */}
         <Route path="/dashboard" element={<DashboardPage />} />
+        
+        {/* Coach Routes */}
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/clients/new" element={<NewClientPage />} />
         <Route path="/clients/:id" element={<ClientDetailPage />} />
@@ -81,6 +90,11 @@ function AppRoutes() {
         <Route path="/workout-plans" element={<WorkoutPlansPage />} />
         <Route path="/diet-plans" element={<DietPlansPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        
+        {/* Client Routes */}
+        <Route path="/my-plan" element={<MyPlanPage />} />
+        <Route path="/check-in" element={<CheckInPage />} />
+        <Route path="/progress" element={<ProgressPage />} />
       </Route>
 
       {/* Redirects */}
