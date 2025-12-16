@@ -1,0 +1,204 @@
+# Azure DevOps Pipeline for FitCoach Pro
+# This pipeline builds and deploys both the React frontend and .NET backend
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+variables:
+  # Azure subscription and resource group
+  azureSubscription: 'YOUR_AZURE_SUBSCRIPTION_CONNECTION'
+  resourceGroupName: 'FitCoachPro-RG'
+  
+  # Backend settings
+  backendAppName: 'fitcoachpro-api'
+  backendProjectPath: 'backend/FitCoachPro.API'
+  dotnetVersion: '8.0.x'
+  
+  # Frontend settings
+  frontendAppName: 'fitcoachpro-web'
+  frontendPath: '.'
+  nodeVersion: '20.x'
+  
+  # Build configuration
+  buildConfiguration: 'Release'
+
+stages:
+  # ============================================
+  # BUILD STAGE
+  # ============================================
+  - stage: Build
+    displayName: 'Build Stage'
+    jobs:
+      # Build .NET Backend
+      - job: BuildBackend
+        displayName: 'Build .NET Backend'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Install .NET SDK'
+            inputs:
+              packageType: 'sdk'
+              version: '$(dotnetVersion)'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore NuGet packages'
+            inputs:
+              command: 'restore'
+              projects: '$(backendProjectPath)/*.csproj'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Build Backend'
+            inputs:
+              command: 'build'
+              projects: '$(backendProjectPath)/*.csproj'
+              arguments: '--configuration $(buildConfiguration) --no-restore'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Run Tests'
+            inputs:
+              command: 'test'
+              projects: '$(backendProjectPath).Tests/*.csproj'
+              arguments: '--configuration $(buildConfiguration) --no-build'
+            continueOnError: true
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish Backend'
+            inputs:
+              command: 'publish'
+              publishWebProjects: false
+              projects: '$(backendProjectPath)/*.csproj'
+              arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)/backend --no-build'
+              zipAfterPublish: true
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Backend Artifact'
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/backend'
+              artifactName: 'backend'
+
+      # Build React Frontend
+      - job: BuildFrontend
+        displayName: 'Build React Frontend'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: NodeTool@0
+            displayName: 'Install Node.js'
+            inputs:
+              versionSpec: '$(nodeVersion)'
+
+          - script: npm ci
+            displayName: 'Install dependencies'
+            workingDirectory: '$(frontendPath)'
+
+          - script: npm run build
+            displayName: 'Build Frontend'
+            workingDirectory: '$(frontendPath)'
+            env:
+              VITE_API_URL: 'https://$(backendAppName).azurewebsites.net/api'
+
+          - task: ArchiveFiles@2
+            displayName: 'Archive Frontend Build'
+            inputs:
+              rootFolderOrFile: '$(frontendPath)/dist'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/frontend/frontend.zip'
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish Frontend Artifact'
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/frontend'
+              artifactName: 'frontend'
+
+  # ============================================
+  # DEPLOY TO DEVELOPMENT
+  # ============================================
+  - stage: DeployDev
+    displayName: 'Deploy to Development'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    variables:
+      environment: 'dev'
+    jobs:
+      - deployment: DeployBackendDev
+        displayName: 'Deploy Backend to Dev'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'FitCoachPro-Dev'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: 'Deploy Backend to Azure'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appType: 'webAppLinux'
+                    appName: '$(backendAppName)-dev'
+                    package: '$(Pipeline.Workspace)/backend/*.zip'
+                    runtimeStack: 'DOTNETCORE|8.0'
+
+      - deployment: DeployFrontendDev
+        displayName: 'Deploy Frontend to Dev'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'FitCoachPro-Dev'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: 'Deploy Frontend to Azure'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appType: 'webAppLinux'
+                    appName: '$(frontendAppName)-dev'
+                    package: '$(Pipeline.Workspace)/frontend/*.zip'
+
+  # ============================================
+  # DEPLOY TO PRODUCTION
+  # ============================================
+  - stage: DeployProd
+    displayName: 'Deploy to Production'
+    dependsOn: Build
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployBackendProd
+        displayName: 'Deploy Backend to Production'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'FitCoachPro-Prod'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: 'Deploy Backend to Azure'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appType: 'webAppLinux'
+                    appName: '$(backendAppName)'
+                    package: '$(Pipeline.Workspace)/backend/*.zip'
+                    runtimeStack: 'DOTNETCORE|8.0'
+
+      - deployment: DeployFrontendProd
+        displayName: 'Deploy Frontend to Production'
+        pool:
+          vmImage: 'ubuntu-latest'
+        environment: 'FitCoachPro-Prod'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: 'Deploy Frontend to Azure'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appType: 'webAppLinux'
+                    appName: '$(frontendAppName)'
+                    package: '$(Pipeline.Workspace)/frontend/*.zip'
