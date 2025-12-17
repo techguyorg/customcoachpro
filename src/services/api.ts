@@ -26,7 +26,9 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
+    // const url = `${this.baseUrl}${endpoint}`;
+    const url = `${this.baseUrl.replace(/\/$/, '')}/${endpoint.replace(/^\//, '')}`;
+
     
     const headers: HeadersInit = {
       'Content-Type': 'application/json',

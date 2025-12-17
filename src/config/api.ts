@@ -1,6 +1,8 @@
 // API Configuration
 // Update this URL when deploying to Azure
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7001/api';
+// export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://localhost:7001/api';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5098/api";
+
 
 export const API_ENDPOINTS = {
   // Auth

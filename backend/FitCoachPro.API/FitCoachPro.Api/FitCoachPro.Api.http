@@ -1,0 +1,6 @@
+@FitCoachPro.Api_HostAddress = http://localhost:5098
+
+GET {{FitCoachPro.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
