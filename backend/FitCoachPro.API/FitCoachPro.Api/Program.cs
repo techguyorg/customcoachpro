@@ -133,6 +133,7 @@ app.MapDashboardEndpoints();
 app.MapProfileEndpoints();
 app.MapCheckInEndpoints();
 app.MapWorkoutPlanEndpoints();
+app.MapDietPlanEndpoints();
 
 app.MapControllers();
 

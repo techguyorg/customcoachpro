@@ -18,6 +18,13 @@ public class AppDbContext : DbContext
     public DbSet<WorkoutDay> WorkoutDays => Set<WorkoutDay>();
     public DbSet<WorkoutExercise> WorkoutExercises => Set<WorkoutExercise>();
     public DbSet<ClientWorkoutPlan> ClientWorkoutPlans => Set<ClientWorkoutPlan>();
+    public DbSet<Food> Foods => Set<Food>();
+    public DbSet<Meal> Meals => Set<Meal>();
+    public DbSet<MealFood> MealFoods => Set<MealFood>();
+    public DbSet<DietPlan> DietPlans => Set<DietPlan>();
+    public DbSet<DietDay> DietDays => Set<DietDay>();
+    public DbSet<DietMeal> DietMeals => Set<DietMeal>();
+    public DbSet<ClientDietPlan> ClientDietPlans => Set<ClientDietPlan>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -85,6 +92,46 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<ClientWorkoutPlan>()
             .HasIndex(c => new { c.ClientId, c.WorkoutPlanId })
+            .IsUnique();
+
+        modelBuilder.Entity<MealFood>()
+            .HasOne(mf => mf.Meal)
+            .WithMany(m => m.Foods)
+            .HasForeignKey(mf => mf.MealId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<MealFood>()
+            .HasOne(mf => mf.Food)
+            .WithMany(f => f.MealFoods)
+            .HasForeignKey(mf => mf.FoodId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DietPlan>()
+            .HasMany(p => p.Days)
+            .WithOne(d => d.DietPlan)
+            .HasForeignKey(d => d.DietPlanId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DietDay>()
+            .HasMany(d => d.Meals)
+            .WithOne(m => m.DietDay)
+            .HasForeignKey(m => m.DietDayId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<DietMeal>()
+            .HasOne(dm => dm.Meal)
+            .WithMany(m => m.DietMeals)
+            .HasForeignKey(dm => dm.MealId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ClientDietPlan>()
+            .HasOne(c => c.DietPlan)
+            .WithMany(p => p.Assignments)
+            .HasForeignKey(c => c.DietPlanId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClientDietPlan>()
+            .HasIndex(c => new { c.ClientId, c.DietPlanId })
             .IsUnique();
     }
 }
