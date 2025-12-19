@@ -10,17 +10,26 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import dashboardService from "@/services/dashboardService";
 import coachService from "@/services/coachService";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function CoachDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const { data: stats } = useQuery({
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+  } = useQuery({
     queryKey: ["dashboard", "coach"],
     queryFn: () => dashboardService.getCoachStats(),
   });
 
-  const { data: clients } = useQuery({
+  const {
+    data: clients,
+    isLoading: clientsLoading,
+    isError: clientsError,
+  } = useQuery({
     queryKey: ["coach", "clients", "recent"],
     queryFn: () => coachService.getClients(),
   });
@@ -54,6 +63,37 @@ export function CoachDashboard() {
     { id: "2", clientName: "—", type: "Workout", date: "—" },
   ];
 
+  const statCards = [
+    {
+      title: "Total Clients",
+      value: stats?.totalClients ?? 0,
+      subtitle: `${stats?.activeClients ?? 0} active`,
+      icon: Users,
+      variant: "primary" as const,
+    },
+    {
+      title: "Pending Check-ins",
+      value: stats?.pendingCheckIns ?? 0,
+      subtitle: "Awaiting review",
+      icon: ClipboardCheck,
+      variant: "secondary" as const,
+    },
+    {
+      title: "Workout Plans",
+      value: stats?.workoutPlansCreated ?? 0,
+      subtitle: "Created",
+      icon: Dumbbell,
+      variant: "accent" as const,
+    },
+    {
+      title: "Diet Plans",
+      value: stats?.dietPlansCreated ?? 0,
+      subtitle: "Created",
+      icon: Utensils,
+      variant: "default" as const,
+    },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -68,34 +108,24 @@ export function CoachDashboard() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Clients"
-          value={stats?.totalClients ?? 0}
-          subtitle={`${stats?.activeClients ?? 0} active`}
-          icon={Users}
-          variant="primary"
-        />
-        <StatCard
-          title="Pending Check-ins"
-          value={stats?.pendingCheckIns ?? 0}
-          subtitle="Awaiting review"
-          icon={ClipboardCheck}
-          variant="secondary"
-        />
-        <StatCard
-          title="Workout Plans"
-          value={stats?.workoutPlansCreated ?? 0}
-          subtitle="Created"
-          icon={Dumbbell}
-          variant="accent"
-        />
-        <StatCard
-          title="Diet Plans"
-          value={stats?.dietPlansCreated ?? 0}
-          subtitle="Created"
-          icon={Utensils}
-        />
+        {statsLoading
+          ? Array.from({ length: statCards.length }).map((_, idx) => (
+              <Skeleton key={idx} className="h-32 w-full rounded-xl" />
+            ))
+          : statCards.map((card) => (
+              <StatCard
+                key={card.title}
+                title={card.title}
+                value={card.value}
+                subtitle={card.subtitle}
+                icon={card.icon}
+                variant={card.variant}
+              />
+            ))}
       </div>
+      {statsError && (
+        <p className="text-sm text-destructive">Unable to load dashboard stats right now.</p>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -110,7 +140,21 @@ export function CoachDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentClients.length === 0 ? (
+              {clientsLoading ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <Skeleton className="h-12 w-12 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-1/3" />
+                        <Skeleton className="h-3 w-1/4" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : clientsError ? (
+                <p className="text-sm text-destructive">Unable to load clients right now.</p>
+              ) : recentClients.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No clients assigned yet.</p>
               ) : (
                 recentClients.map((client) => (
