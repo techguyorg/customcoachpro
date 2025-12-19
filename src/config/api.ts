@@ -45,26 +45,9 @@ export const API_ENDPOINTS = {
 
   // Check-ins
   checkIns: {
-    weight: {
-      base: "/checkins/weight",
-      byId: (id: string) => `/checkins/weight/${id}`,
-      byClient: (clientId: string) => `/checkins/weight/client/${clientId}`,
-    },
-    photos: {
-      base: "/checkins/photos",
-      byId: (id: string) => `/checkins/photos/${id}`,
-      byClient: (clientId: string) => `/checkins/photos/client/${clientId}`,
-    },
-    workout: {
-      base: "/checkins/workout",
-      byId: (id: string) => `/checkins/workout/${id}`,
-      byClient: (clientId: string) => `/checkins/workout/client/${clientId}`,
-    },
-    diet: {
-      base: "/checkins/diet",
-      byId: (id: string) => `/checkins/diet/${id}`,
-      byClient: (clientId: string) => `/checkins/diet/client/${clientId}`,
-    },
+    base: "/checkins",
+    byId: (id: string) => `/checkins/${id}`,
+    review: (id: string) => `/checkins/${id}/review`,
   },
 
   // Exercises

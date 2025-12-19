@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
     public DbSet<CoachClient> CoachClients => Set<CoachClient>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<CheckIn> CheckIns => Set<CheckIn>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,5 +52,13 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<CoachClient>()
             .HasIndex(cc => new { cc.CoachId, cc.ClientId })
             .IsUnique();
+
+        modelBuilder.Entity<CheckIn>()
+            .Property(c => c.Type)
+            .HasMaxLength(20);
+
+        modelBuilder.Entity<CheckIn>()
+            .Property(c => c.Status)
+            .HasMaxLength(20);
     }
 }

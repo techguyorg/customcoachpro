@@ -1,121 +1,154 @@
-import { API_ENDPOINTS } from '@/config/api';
-import apiService from './api';
-import type { 
-  WeightCheckIn, 
-  ProgressPhoto, 
-  WorkoutCheckIn, 
-  DietCheckIn,
-  ApiResponse 
-} from '@/types';
+import { API_ENDPOINTS } from "@/config/api";
+import apiService from "./api";
 
-export interface CreateWeightCheckInRequest {
-  clientId: string;
-  date: string;
-  weight: number;
-  bodyFatPercentage?: number;
+export type CheckInType = "weight" | "workout" | "diet" | "photos";
+export type CheckInStatus = "pending" | "reviewed";
+
+export type CheckInData = {
+  weight?: number;
+  bodyFat?: number;
   waist?: number;
   chest?: number;
   arms?: number;
   thighs?: number;
-  notes?: string;
-}
+  completed?: boolean;
+  workoutNotes?: string | null;
+  complianceRating?: number;
+  deviations?: string | null;
+  photos?: {
+    front?: string | null;
+    side?: string | null;
+    back?: string | null;
+  };
+};
 
-export interface CreateDietCheckInRequest {
+export type CheckIn = {
+  id: string;
   clientId: string;
-  dietPlanId: string;
-  date: string;
-  complianceRating: number;
-  deviations?: string;
-  notes?: string;
-}
+  coachId?: string;
+  clientName: string;
+  clientAvatar?: string | null;
+  type: CheckInType;
+  status: CheckInStatus;
+  submittedAt: string;
+  notes?: string | null;
+  data: CheckInData;
+};
 
-export interface CreateWorkoutCheckInRequest {
+export type CreateCheckInPayload = {
   clientId: string;
-  workoutPlanId: string;
-  date: string;
-  completed: boolean;
+  type: CheckInType;
+  submittedAt?: string;
+  weight?: number;
+  bodyFat?: number;
+  waist?: number;
+  chest?: number;
+  arms?: number;
+  thighs?: number;
+  workoutCompleted?: boolean;
+  workoutNotes?: string;
+  dietCompliance?: number;
+  dietDeviations?: string;
+  frontPhotoUrl?: string;
+  sidePhotoUrl?: string;
+  backPhotoUrl?: string;
   notes?: string;
-}
+};
 
-export const checkInService = {
-  // Weight Check-ins
-  async getWeightCheckIns(clientId: string): Promise<WeightCheckIn[]> {
-    const response = await apiService.get<ApiResponse<WeightCheckIn[]>>(
-      API_ENDPOINTS.checkIns.weight.byClient(clientId)
-    );
-    return response.data;
+export type UpdateCheckInPayload = Partial<CreateCheckInPayload> & {
+  status?: CheckInStatus;
+};
+
+type CheckInApi = {
+  id: string;
+  clientId: string;
+  coachId?: string;
+  clientName: string;
+  clientAvatar?: string | null;
+  type: CheckInType;
+  status: CheckInStatus;
+  submittedAt: string;
+  notes?: string | null;
+  data?: {
+    weight?: number;
+    bodyFat?: number;
+    waist?: number;
+    chest?: number;
+    arms?: number;
+    thighs?: number;
+    completed?: boolean;
+    workoutNotes?: string | null;
+    complianceRating?: number;
+    deviations?: string | null;
+    photos?: {
+      front?: string | null;
+      side?: string | null;
+      back?: string | null;
+    };
+  };
+};
+
+const toDomain = (api: CheckInApi): CheckIn => {
+  const photos = api.data?.photos ?? {};
+
+  return {
+    id: api.id,
+    clientId: api.clientId,
+    coachId: api.coachId,
+    clientName: api.clientName,
+    clientAvatar: api.clientAvatar,
+    type: api.type,
+    status: api.status,
+    submittedAt: api.submittedAt,
+    notes: api.notes,
+    data: {
+      weight: api.data?.weight,
+      bodyFat: api.data?.bodyFat,
+      waist: api.data?.waist,
+      chest: api.data?.chest,
+      arms: api.data?.arms,
+      thighs: api.data?.thighs,
+      completed: api.data?.completed,
+      workoutNotes: api.data?.workoutNotes,
+      complianceRating: api.data?.complianceRating,
+      deviations: api.data?.deviations,
+      photos: {
+        front: photos.front,
+        side: photos.side,
+        back: photos.back,
+      },
+    },
+  };
+};
+
+const checkInService = {
+  async getCheckIns(): Promise<CheckIn[]> {
+    const response = await apiService.get<CheckInApi[]>(API_ENDPOINTS.checkIns.base);
+    return response.map(toDomain);
   },
 
-  async createWeightCheckIn(data: CreateWeightCheckInRequest): Promise<WeightCheckIn> {
-    const response = await apiService.post<ApiResponse<WeightCheckIn>>(
-      API_ENDPOINTS.checkIns.weight.base,
-      data
-    );
-    return response.data;
+  async getCheckIn(id: string): Promise<CheckIn> {
+    const response = await apiService.get<CheckInApi>(API_ENDPOINTS.checkIns.byId(id));
+    return toDomain(response);
   },
 
-  async deleteWeightCheckIn(id: string): Promise<void> {
-    await apiService.delete(API_ENDPOINTS.checkIns.weight.byId(id));
+  async createCheckIn(payload: CreateCheckInPayload): Promise<CheckIn> {
+    const response = await apiService.post<CheckInApi>(API_ENDPOINTS.checkIns.base, payload);
+    return toDomain(response);
   },
 
-  // Progress Photos
-  async getProgressPhotos(clientId: string): Promise<ProgressPhoto[]> {
-    const response = await apiService.get<ApiResponse<ProgressPhoto[]>>(
-      API_ENDPOINTS.checkIns.photos.byClient(clientId)
-    );
-    return response.data;
+  async updateCheckIn(id: string, payload: UpdateCheckInPayload): Promise<CheckIn> {
+    const response = await apiService.put<CheckInApi>(API_ENDPOINTS.checkIns.byId(id), payload);
+    return toDomain(response);
   },
 
-  async uploadProgressPhoto(
-    clientId: string,
-    date: string,
-    photoType: 'front' | 'side' | 'back',
-    file: File
-  ): Promise<ProgressPhoto> {
-    const formData = new FormData();
-    formData.append('clientId', clientId);
-    formData.append('date', date);
-    formData.append('photoType', photoType);
-    formData.append('file', file);
-
-    const response = await apiService.uploadFile(
-      API_ENDPOINTS.checkIns.photos.base,
-      file,
-      'file'
-    );
-    return response as ProgressPhoto;
+  async deleteCheckIn(id: string): Promise<void> {
+    await apiService.delete(API_ENDPOINTS.checkIns.byId(id));
   },
 
-  // Workout Check-ins
-  async getWorkoutCheckIns(clientId: string): Promise<WorkoutCheckIn[]> {
-    const response = await apiService.get<ApiResponse<WorkoutCheckIn[]>>(
-      API_ENDPOINTS.checkIns.workout.byClient(clientId)
-    );
-    return response.data;
-  },
-
-  async createWorkoutCheckIn(data: CreateWorkoutCheckInRequest): Promise<WorkoutCheckIn> {
-    const response = await apiService.post<ApiResponse<WorkoutCheckIn>>(
-      API_ENDPOINTS.checkIns.workout.base,
-      data
-    );
-    return response.data;
-  },
-
-  // Diet Check-ins
-  async getDietCheckIns(clientId: string): Promise<DietCheckIn[]> {
-    const response = await apiService.get<ApiResponse<DietCheckIn[]>>(
-      API_ENDPOINTS.checkIns.diet.byClient(clientId)
-    );
-    return response.data;
-  },
-
-  async createDietCheckIn(data: CreateDietCheckInRequest): Promise<DietCheckIn> {
-    const response = await apiService.post<ApiResponse<DietCheckIn>>(
-      API_ENDPOINTS.checkIns.diet.base,
-      data
-    );
-    return response.data;
+  async markReviewed(id: string): Promise<CheckIn> {
+    const response = await apiService.put<CheckInApi>(API_ENDPOINTS.checkIns.review(id));
+    return toDomain(response);
   },
 };
 

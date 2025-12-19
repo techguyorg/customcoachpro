@@ -102,6 +102,53 @@ public static class SeedData
             new CoachClient { CoachId = coachId, ClientId = c2Id }
         );
 
+        var now = DateTime.UtcNow;
+        db.CheckIns.AddRange(
+            new CheckIn
+            {
+                ClientId = c1Id,
+                CoachId = coachId,
+                Type = CheckInType.Weight,
+                Status = CheckInStatus.Pending,
+                SubmittedAt = now.AddDays(-1),
+                Weight = 87.2m,
+                BodyFat = 21.5m,
+                Waist = 31,
+                Notes = "Energy trending up"
+            },
+            new CheckIn
+            {
+                ClientId = c1Id,
+                CoachId = coachId,
+                Type = CheckInType.Workout,
+                Status = CheckInStatus.Pending,
+                SubmittedAt = now.AddDays(-2),
+                WorkoutCompleted = true,
+                WorkoutNotes = "Hit a new PR on deadlift"
+            },
+            new CheckIn
+            {
+                ClientId = c2Id,
+                CoachId = coachId,
+                Type = CheckInType.Diet,
+                Status = CheckInStatus.Reviewed,
+                SubmittedAt = now.AddDays(-3),
+                DietCompliance = 8,
+                DietDeviations = "Dessert after dinner on Sunday"
+            },
+            new CheckIn
+            {
+                ClientId = c2Id,
+                CoachId = coachId,
+                Type = CheckInType.Photos,
+                Status = CheckInStatus.Pending,
+                SubmittedAt = now.AddDays(-5),
+                FrontPhotoUrl = "https://placehold.co/200x300?text=Front",
+                SidePhotoUrl = "https://placehold.co/200x300?text=Side",
+                BackPhotoUrl = "https://placehold.co/200x300?text=Back"
+            }
+        );
+
         db.SaveChanges();
     }
 }

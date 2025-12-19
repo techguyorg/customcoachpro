@@ -131,6 +131,7 @@ app.MapCoachEndpoints();
 app.MapClientEndpoints();
 app.MapDashboardEndpoints();
 app.MapProfileEndpoints();
+app.MapCheckInEndpoints();
 
 app.MapControllers();
 
