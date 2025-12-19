@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FitCoachPro.Api.Data;
+using FitCoachPro.Api.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,17 +18,23 @@ public static class DashboardEndpoints
             if (coachIdStr is null || !Guid.TryParse(coachIdStr, out var coachId))
                 return Results.Unauthorized();
 
-            var totalClients = await db.CoachClients.CountAsync(x => x.CoachId == coachId && x.IsActive);
+            var totalClientsTask = db.CoachClients.CountAsync(x => x.CoachId == coachId && x.IsActive);
+            var pendingCheckInsTask = db.CheckIns.CountAsync(x => x.CoachId == coachId && x.Status == CheckInStatus.Pending);
+            var workoutPlansCreatedTask = db.WorkoutPlans.CountAsync(x => x.CoachId == coachId);
+            var dietPlansCreatedTask = db.DietPlans.CountAsync(x => x.CoachId == coachId);
+
+            await Task.WhenAll(totalClientsTask, pendingCheckInsTask, workoutPlansCreatedTask, dietPlansCreatedTask);
+
+            var totalClients = await totalClientsTask;
             var activeClients = totalClients;
 
-            // Sprint 2: check-ins / plans not implemented => 0
             return Results.Ok(new
             {
                 totalClients,
                 activeClients,
-                pendingCheckIns = 0,
-                workoutPlansCreated = 0,
-                dietPlansCreated = 0
+                pendingCheckIns = await pendingCheckInsTask,
+                workoutPlansCreated = await workoutPlansCreatedTask,
+                dietPlansCreated = await dietPlansCreatedTask
             });
         });
 
