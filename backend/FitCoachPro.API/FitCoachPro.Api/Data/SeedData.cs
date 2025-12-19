@@ -8,28 +8,98 @@ public static class SeedData
     {
         if (db.Users.Any()) return;
 
-        db.Users.AddRange(
-            new User
+        var adminId = Guid.NewGuid();
+        var coachId = Guid.NewGuid();
+        var c1Id = Guid.NewGuid();
+        var c2Id = Guid.NewGuid();
+        var soloId = Guid.NewGuid();
+
+        var admin = new User
+        {
+            Id = adminId,
+            Email = "admin@fitcoach.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+            Role = "admin",
+            Profile = new UserProfile
             {
-                Email = "coach@fitcoach.com",
-                FullName = "Demo Coach",
-                Role = "Coach",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!")
-            },
-            new User
-            {
-                Email = "client@fitcoach.com",
-                FullName = "Demo Client",
-                Role = "Client",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!")
-            },
-            new User
-            {
-                Email = "mike@fitcoach.com",
-                FullName = "Mike Demo",
-                Role = "Client",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!")
+                UserId = adminId,
+                DisplayName = "Admin"
             }
+        };
+
+        var coach = new User
+        {
+            Id = coachId,
+            Email = "coach@fitcoach.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+            Role = "coach",
+            Profile = new UserProfile
+            {
+                UserId = coachId,
+                DisplayName = "Coach One",
+                Bio = "Strength & fat-loss coach"
+            }
+        };
+
+        var c1 = new User
+        {
+            Id = c1Id,
+            Email = "client1@fitcoach.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+            Role = "client",
+            Profile = new UserProfile
+            {
+                UserId = c1Id,
+                DisplayName = "Client One",
+                StartDate = DateTime.UtcNow.Date.AddDays(-28),
+                HeightCm = 175,
+                StartWeight = 90,
+                CurrentWeight = 87,
+                TargetWeight = 80
+            }
+        };
+
+        var c2 = new User
+        {
+            Id = c2Id,
+            Email = "client2@fitcoach.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+            Role = "client",
+            Profile = new UserProfile
+            {
+                UserId = c2Id,
+                DisplayName = "Client Two",
+                StartDate = DateTime.UtcNow.Date.AddDays(-14),
+                HeightCm = 168,
+                StartWeight = 75,
+                CurrentWeight = 74,
+                TargetWeight = 68
+            }
+        };
+
+        var solo = new User
+        {
+            Id = soloId,
+            Email = "solo@fitcoach.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Password123!"),
+            Role = "client",
+            Profile = new UserProfile
+            {
+                UserId = soloId,
+                DisplayName = "Solo Client",
+                StartDate = DateTime.UtcNow.Date.AddDays(-7),
+                HeightCm = 180,
+                StartWeight = 95,
+                CurrentWeight = 95,
+                TargetWeight = 88
+            }
+        };
+
+        db.Users.AddRange(admin, coach, c1, c2, solo);
+
+        db.CoachClients.AddRange(
+            new CoachClient { CoachId = coachId, ClientId = c1Id },
+            new CoachClient { CoachId = coachId, ClientId = c2Id }
         );
 
         db.SaveChanges();

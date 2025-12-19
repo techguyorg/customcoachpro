@@ -1,85 +1,87 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Mail, Phone, Calendar, Target, Scale, TrendingDown, Edit } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
-
-// Mock client data
-const mockClient = {
-  id: '1',
-  email: 'sarah.johnson@email.com',
-  firstName: 'Sarah',
-  lastName: 'Johnson',
-  role: 'client' as const,
-  coachId: 'coach1',
-  goals: 'Lose 20 lbs, build strength, improve overall fitness and energy levels',
-  startDate: '2024-01-15',
-  currentWeight: 165,
-  targetWeight: 145,
-  height: 65, // inches
-  notes: 'Prefers morning workouts. Has a minor knee injury - avoid high impact exercises.',
-  createdAt: '2024-01-15T00:00:00Z',
-  updatedAt: '2024-03-01T00:00:00Z',
-};
-
-const mockWeightHistory = [
-  { date: '2024-01-15', weight: 175 },
-  { date: '2024-02-01', weight: 172 },
-  { date: '2024-02-15', weight: 169 },
-  { date: '2024-03-01', weight: 167 },
-  { date: '2024-03-15', weight: 165 },
-];
-
-const mockCheckIns = [
-  { id: '1', type: 'Weight', date: '2024-03-15', status: 'reviewed' },
-  { id: '2', type: 'Workout', date: '2024-03-14', status: 'reviewed' },
-  { id: '3', type: 'Diet', date: '2024-03-14', status: 'pending' },
-  { id: '4', type: 'Photos', date: '2024-03-10', status: 'reviewed' },
-];
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Mail, Calendar, Target, Scale, TrendingDown, Edit } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
+import { useQuery } from "@tanstack/react-query";
+import coachService from "@/services/coachService";
 
 export function ClientDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
-  // In a real app, fetch client data based on id
-  const client = mockClient;
-  
-  const weightLost = mockWeightHistory[0].weight - mockWeightHistory[mockWeightHistory.length - 1].weight;
-  const progressPercentage = Math.round((weightLost / (mockWeightHistory[0].weight - client.targetWeight)) * 100);
+
+  const clientId = id ?? "";
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["coach", "client", clientId],
+    queryFn: () => coachService.getClient(clientId),
+    enabled: !!clientId,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-xl font-bold">Client not found</h1>
+        <p className="text-muted-foreground">
+          {error instanceof Error ? error.message : "Unable to load client."}
+        </p>
+        <Button variant="outline" onClick={() => navigate("/clients")}>
+          Back to Clients
+        </Button>
+      </div>
+    );
+  }
+
+  const profile = data.profile;
+  const displayName = profile.displayName || data.email;
+
+  const currentWeight = Number(profile.currentWeight ?? 0);
+  const startWeight = Number(profile.startWeight ?? profile.currentWeight ?? 0);
+  const targetWeight = Number(profile.targetWeight ?? 0);
+
+  const weightLost = Math.max(0, startWeight - currentWeight);
+  const totalToLose = Math.max(0, startWeight - targetWeight);
+  const progressPercentage = totalToLose > 0 ? Math.round((weightLost / totalToLose) * 100) : 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/clients')}>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/clients")}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
+
         <div className="flex-1 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16 border-2 border-primary/20">
-              <AvatarImage src="" />
               <AvatarFallback className="bg-primary/10 text-primary text-xl">
-                {client.firstName[0]}{client.lastName[0]}
+                {displayName?.[0]?.toUpperCase() ?? "C"}
               </AvatarFallback>
             </Avatar>
+
             <div>
-              <h1 className="text-2xl font-display font-bold">
-                {client.firstName} {client.lastName}
-              </h1>
-              <p className="text-muted-foreground">{client.email}</p>
+              <h1 className="text-2xl font-display font-bold">{displayName}</h1>
+              <p className="text-muted-foreground">{data.email}</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => navigate(`/clients/${id}/edit`)}>
+
+          <Button variant="outline" onClick={() => navigate(`/clients/${clientId}/edit`)}>
             <Edit className="h-4 w-4 mr-2" />
             Edit Profile
           </Button>
         </div>
       </div>
 
-      {/* Quick Stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
@@ -89,11 +91,12 @@ export function ClientDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Current Weight</p>
-                <p className="text-xl font-bold">{client.currentWeight} lbs</p>
+                <p className="text-xl font-bold">{currentWeight || 0} lbs</p>
               </div>
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -102,11 +105,12 @@ export function ClientDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Target Weight</p>
-                <p className="text-xl font-bold">{client.targetWeight} lbs</p>
+                <p className="text-xl font-bold">{targetWeight || 0} lbs</p>
               </div>
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -120,6 +124,7 @@ export function ClientDetailPage() {
             </div>
           </CardContent>
         </Card>
+
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -127,20 +132,21 @@ export function ClientDetailPage() {
                 <Calendar className="h-5 w-5 text-secondary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Days on Plan</p>
-                <p className="text-xl font-bold">60</p>
+                <p className="text-sm text-muted-foreground">Start Date</p>
+                <p className="text-xl font-bold">
+                  {profile.startDate ? new Date(profile.startDate).toLocaleDateString() : "—"}
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Progress Bar */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Goal Progress</CardTitle>
           <CardDescription>
-            {weightLost} of {mockWeightHistory[0].weight - client.targetWeight} lbs to goal
+            {weightLost} of {totalToLose} lbs to goal
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -149,7 +155,6 @@ export function ClientDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Tabs */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -165,32 +170,30 @@ export function ClientDetailPage() {
                 <CardTitle className="text-lg">Goals</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">{client.goals}</p>
+                <p className="text-muted-foreground">{profile.bio || "No goals set"}</p>
               </CardContent>
             </Card>
+
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Notes</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">{client.notes || 'No notes'}</p>
+                <p className="text-muted-foreground">Notes feature comes later (Sprint 3).</p>
               </CardContent>
             </Card>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Contact Information</CardTitle>
+              <CardTitle className="text-lg">Contact</CardTitle>
             </CardHeader>
             <CardContent className="flex gap-4">
               <Button variant="outline">
                 <Mail className="h-4 w-4 mr-2" />
-                {client.email}
+                {data.email}
               </Button>
-              <Button variant="outline">
-                <Phone className="h-4 w-4 mr-2" />
-                Contact
-              </Button>
+              <Badge variant="outline">Assigned</Badge>
             </CardContent>
           </Card>
         </TabsContent>
@@ -199,32 +202,10 @@ export function ClientDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Recent Check-ins</CardTitle>
+              <CardDescription>Planned in Sprint 3</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {mockCheckIns.map((checkIn) => (
-                  <div
-                    key={checkIn.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                  >
-                    <div>
-                      <p className="font-medium">{checkIn.type} Check-in</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(checkIn.date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <Badge
-                      className={
-                        checkIn.status === 'reviewed'
-                          ? 'bg-vitality/20 text-vitality border-0'
-                          : 'bg-energy/20 text-energy border-0'
-                      }
-                    >
-                      {checkIn.status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
+              <p className="text-muted-foreground">No check-ins yet.</p>
             </CardContent>
           </Card>
         </TabsContent>
@@ -233,6 +214,7 @@ export function ClientDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Assigned Plans</CardTitle>
+              <CardDescription>Planned in Sprint 3</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">No plans assigned yet.</p>
@@ -244,6 +226,7 @@ export function ClientDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Progress Photos</CardTitle>
+              <CardDescription>Planned in Sprint 4</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">No photos uploaded yet.</p>

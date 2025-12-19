@@ -5,21 +5,53 @@ using FitCoachPro.Api.Endpoints;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(); // requires Swashbuckle.AspNetCore
+
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "FitCoachPro API", Version = "v1" });
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter: Bearer {your JWT token}"
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference { Type = ReferenceType.SecurityScheme, Id = "Bearer" }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<JwtTokenService>();
 
-// Dummy DB for now
-builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("FitCoachPro"));
+// ✅ DB selection: SQL if available, else InMemory
+var sqlConn = builder.Configuration.GetConnectionString("SqlConnection");
+if (!string.IsNullOrWhiteSpace(sqlConn))
+{
+    builder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlServer(sqlConn));
+}
+else
+{
+    builder.Services.AddDbContext<AppDbContext>(opt => opt.UseInMemoryDatabase("fitcoachpro"));
+}
 
-// CORS
-var allowed = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
 // CORS
 builder.Services.AddCors(opt =>
 {
@@ -27,7 +59,6 @@ builder.Services.AddCors(opt =>
     {
         if (builder.Environment.IsDevelopment())
         {
-            // Allow any localhost/127.0.0.1 port in dev (5173, 5174, etc.)
             p.SetIsOriginAllowed(origin =>
             {
                 if (string.IsNullOrWhiteSpace(origin)) return false;
@@ -48,24 +79,22 @@ builder.Services.AddCors(opt =>
 });
 
 // JWT auth
-var jwt = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()!;
-if (string.IsNullOrWhiteSpace(jwt.Key) || jwt.Key.Length < 32)
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var jwtKey = jwtSection.GetValue<string>("Key") ?? "CHANGE_ME_DEV_KEY_32_CHARS_MINIMUM";
+
+if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
     throw new InvalidOperationException("Jwt:Key must be set in appsettings.json (>= 32 chars).");
 
-var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Key));
-
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(opt =>
+    .AddJwtBearer(options =>
     {
-        opt.TokenValidationParameters = new TokenValidationParameters
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
+            ValidateIssuer = false,
+            ValidateAudience = false,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwt.Issuer,
-            ValidAudience = jwt.Audience,
-            IssuerSigningKey = key,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+            ValidateLifetime = true,
             ClockSkew = TimeSpan.FromSeconds(30)
         };
     });
@@ -81,15 +110,27 @@ app.UseCors("cors");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Seed dummy users
+// ✅ Apply migrations automatically when using SQL Server
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    // If SQL Server is used, apply migrations
+    if (!string.IsNullOrWhiteSpace(sqlConn))
+    {
+        db.Database.Migrate();
+    }
+
     SeedData.EnsureSeeded(db);
 }
 
 app.MapGet("/api/health", () => Results.Ok(new { ok = true, time = DateTime.UtcNow }));
+
 app.MapAuthEndpoints();
+app.MapCoachEndpoints();
+app.MapClientEndpoints();
+app.MapDashboardEndpoints();
+app.MapProfileEndpoints();
 
 app.MapControllers();
 

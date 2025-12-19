@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ViewModeProvider } from "@/contexts/ViewModeContext";
+import type { UserRole } from "@/types";
 
 // Layouts
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -23,48 +25,73 @@ import { WorkoutPlansPage } from "@/pages/workouts/WorkoutPlansPage";
 import { DietPlansPage } from "@/pages/diet/DietPlansPage";
 import { AnalyticsPage } from "@/pages/analytics/AnalyticsPage";
 
+// ✅ Sprint 2: Edit Client page
+import EditClientPage from "@/pages/clients/EditClientPage";
+
 // Client Pages
 import { MyPlanPage } from "@/pages/client/MyPlanPage";
 import { CheckInPage } from "@/pages/client/CheckInPage";
 import { ProgressPage } from "@/pages/client/ProgressPage";
 
+// Admin
+import { AdminPage } from "@/pages/admin/AdminPage";
+
+// Settings
+import { SettingsPage } from "@/pages/settings/SettingsPage";
+
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
+  if (isLoading) return <LoadingScreen />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+}
+
+function RoleRoute({
+  allowed,
+  children,
+}: {
+  allowed: UserRole[];
+  children: React.ReactNode;
+}) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) return <LoadingScreen />;
+  if (!user) return <Navigate to="/login" replace />;
+
+  // Admin strict routing
+  if (user.role === "admin" && !allowed.includes("admin")) {
+    return <Navigate to="/admin" replace />;
   }
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+
+  if (!allowed.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
-  
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    );
-  }
-  
+  const { isAuthenticated, isLoading, user } = useAuth();
+
+  if (isLoading) return <LoadingScreen />;
+
   if (isAuthenticated) {
+    if (user?.role === "admin") return <Navigate to="/admin" replace />;
     return <Navigate to="/dashboard" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
@@ -72,35 +99,152 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route element={<PublicRoute><AuthLayout /></PublicRoute>}>
+      <Route
+        element={
+          <PublicRoute>
+            <AuthLayout />
+          </PublicRoute>
+        }
+      >
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
 
       {/* Protected Routes */}
-      <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-        {/* Shared */}
-        <Route path="/dashboard" element={<DashboardPage />} />
-        
+      <Route
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      >
+        {/* Shared (Coach/Client only) */}
+        <Route
+          path="/dashboard"
+          element={
+            <RoleRoute allowed={["coach", "client"]}>
+              <DashboardPage />
+            </RoleRoute>
+          }
+        />
+
+        {/* Settings (Coach/Client only for now) */}
+        <Route
+          path="/settings"
+          element={
+            <RoleRoute allowed={["coach", "client"]}>
+              <SettingsPage />
+            </RoleRoute>
+          }
+        />
+
+        {/* Admin only */}
+        <Route
+          path="/admin"
+          element={
+            <RoleRoute allowed={["admin"]}>
+              <AdminPage />
+            </RoleRoute>
+          }
+        />
+
         {/* Coach Routes */}
-        <Route path="/clients" element={<ClientsPage />} />
-        <Route path="/clients/new" element={<NewClientPage />} />
-        <Route path="/clients/:id" element={<ClientDetailPage />} />
-        <Route path="/check-ins" element={<CheckInsPage />} />
-        <Route path="/workout-plans" element={<WorkoutPlansPage />} />
-        <Route path="/diet-plans" element={<DietPlansPage />} />
-        <Route path="/analytics" element={<AnalyticsPage />} />
-        
+        <Route
+          path="/clients"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <ClientsPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/clients/new"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <NewClientPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/clients/:id"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <ClientDetailPage />
+            </RoleRoute>
+          }
+        />
+
+        {/* ✅ Sprint 2: Edit client route */}
+        <Route
+          path="/clients/:id/edit"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <EditClientPage />
+            </RoleRoute>
+          }
+        />
+
+        <Route
+          path="/check-ins"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <CheckInsPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/workout-plans"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <WorkoutPlansPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/diet-plans"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <DietPlansPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/analytics"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <AnalyticsPage />
+            </RoleRoute>
+          }
+        />
+
         {/* Client Routes */}
-        <Route path="/my-plan" element={<MyPlanPage />} />
-        <Route path="/check-in" element={<CheckInPage />} />
-        <Route path="/progress" element={<ProgressPage />} />
+        <Route
+          path="/my-plan"
+          element={
+            <RoleRoute allowed={["client"]}>
+              <MyPlanPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/check-in"
+          element={
+            <RoleRoute allowed={["client"]}>
+              <CheckInPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/progress"
+          element={
+            <RoleRoute allowed={["client"]}>
+              <ProgressPage />
+            </RoleRoute>
+          }
+        />
       </Route>
 
-      {/* Redirects */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      
-      {/* 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -109,13 +253,15 @@ function AppRoutes() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </TooltipProvider>
+      <ViewModeProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </TooltipProvider>
+      </ViewModeProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

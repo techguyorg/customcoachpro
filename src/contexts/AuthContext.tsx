@@ -6,7 +6,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (email: string, password: string, firstName: string, lastName: string, role: 'coach' | 'client') => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -18,23 +18,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedUser = authService.getStoredUser();
-    if (storedUser) {
-      setUser(storedUser);
-    }
-    setIsLoading(false);
+    const init = async () => {
+      const storedUser = authService.getStoredUser();
+      const token = localStorage.getItem('auth_token');
+
+      if (storedUser && token) {
+        setUser(storedUser);
+        try {
+          const me = await authService.getCurrentUser();
+          setUser(me);
+        } catch {
+          await authService.logout();
+          setUser(null);
+        }
+      }
+
+      setIsLoading(false);
+    };
+
+    init();
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await authService.login({ email, password });
     setUser(response.user);
+    return response.user;
   }, []);
 
   const register = useCallback(async (
-    email: string, 
-    password: string, 
-    firstName: string, 
-    lastName: string, 
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string,
     role: 'coach' | 'client'
   ) => {
     const response = await authService.register({ email, password, firstName, lastName, role });

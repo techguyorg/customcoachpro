@@ -1,15 +1,19 @@
 // User Types
-export type UserRole = 'coach' | 'client';
+export type UserRole = 'coach' | 'client' | 'admin';
 
 export interface User {
   id: string;
   email: string;
-  firstName: string;
-  lastName: string;
   role: UserRole;
+
+  // Compatible with backend now + future
+  displayName?: string;
+  firstName?: string;
+  lastName?: string;
   avatarUrl?: string;
-  createdAt: string;
-  updatedAt: string;
+
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Coach extends User {
@@ -20,9 +24,9 @@ export interface Coach extends User {
 
 export interface Client extends User {
   role: 'client';
-  coachId: string;
+  coachId?: string; // can be undefined for solo client
   goals?: string;
-  startDate: string;
+  startDate?: string;
   notes?: string;
   currentWeight?: number;
   targetWeight?: number;
@@ -242,7 +246,7 @@ export interface RegisterRequest {
   password: string;
   firstName: string;
   lastName: string;
-  role: UserRole;
+  role: Extract<UserRole, "coach" | "client">;
 }
 
 export interface AuthResponse {

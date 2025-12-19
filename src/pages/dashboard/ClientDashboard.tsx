@@ -1,98 +1,100 @@
-import { Scale, TrendingUp, Dumbbell, Utensils, Calendar, CheckCircle2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { StatCard } from '@/components/shared/StatCard';
-import { useAuth } from '@/contexts/AuthContext';
-
-// Mock data for demonstration
-const mockStats = {
-  currentWeight: 185,
-  weightChange: -5.2,
-  workoutsCompleted: 12,
-  dietComplianceAverage: 87,
-  daysOnPlan: 28,
-};
-
-const mockTodayWorkout = {
-  name: 'Upper Body Strength',
-  exercises: [
-    { name: 'Bench Press', sets: 4, reps: '8-10' },
-    { name: 'Overhead Press', sets: 3, reps: '10-12' },
-    { name: 'Bent Over Rows', sets: 4, reps: '8-10' },
-    { name: 'Tricep Dips', sets: 3, reps: '12-15' },
-  ],
-};
-
-const mockTodayMeals = [
-  { name: 'Breakfast', time: '7:00 AM', calories: 450, status: 'completed' },
-  { name: 'Snack', time: '10:00 AM', calories: 200, status: 'completed' },
-  { name: 'Lunch', time: '12:30 PM', calories: 650, status: 'upcoming' },
-  { name: 'Dinner', time: '7:00 PM', calories: 700, status: 'upcoming' },
-];
-
-const mockWeeklyProgress = [
-  { day: 'Mon', completed: true },
-  { day: 'Tue', completed: true },
-  { day: 'Wed', completed: true },
-  { day: 'Thu', completed: false },
-  { day: 'Fri', completed: false },
-  { day: 'Sat', completed: false },
-  { day: 'Sun', completed: false },
-];
+import { Scale, TrendingUp, Dumbbell, Utensils, Calendar, CheckCircle2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { StatCard } from "@/components/shared/StatCard";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import dashboardService from "@/services/dashboardService";
 
 export function ClientDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  const { data: stats } = useQuery({
+    queryKey: ["dashboard", "client"],
+    queryFn: () => dashboardService.getClientStats(),
+  });
+
+  const name = user?.displayName || user?.firstName || "there";
+
+  // Keep demo widgets below for now; stats cards are real.
+  const mockTodayWorkout = {
+    name: "Upper Body Strength",
+    exercises: [
+      { name: "Bench Press", sets: 4, reps: "8-10" },
+      { name: "Overhead Press", sets: 3, reps: "10-12" },
+      { name: "Bent Over Rows", sets: 4, reps: "8-10" },
+      { name: "Tricep Dips", sets: 3, reps: "12-15" },
+    ],
+  };
+
+  const mockTodayMeals = [
+    { name: "Breakfast", time: "7:00 AM", calories: 450, status: "completed" },
+    { name: "Snack", time: "10:00 AM", calories: 200, status: "completed" },
+    { name: "Lunch", time: "12:30 PM", calories: 650, status: "upcoming" },
+    { name: "Dinner", time: "7:00 PM", calories: 700, status: "upcoming" },
+  ];
+
+  const mockWeeklyProgress = [
+    { day: "Mon", completed: true },
+    { day: "Tue", completed: true },
+    { day: "Wed", completed: true },
+    { day: "Thu", completed: false },
+    { day: "Fri", completed: false },
+    { day: "Sat", completed: false },
+    { day: "Sun", completed: false },
+  ];
+
+  const weightChangeAbs = Math.abs(stats?.weightChange ?? 0);
+  const weightChangePositive = (stats?.weightChange ?? 0) < 0;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
-        title={`Hey, ${user?.firstName}! 💪`}
-        description="Let's crush your goals today. Here's your game plan."
+        title={`Hey, ${name}! 💪`}
+        description="Let's crush your goals today."
         actions={
-          <Button onClick={() => navigate('/check-in')} className="shadow-energy">
+          <Button onClick={() => navigate("/check-in")} className="shadow-energy">
             Log Check-in
           </Button>
         }
       />
 
-      {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Current Weight"
-          value={`${mockStats.currentWeight} lbs`}
+          value={`${stats?.currentWeight ?? 0} lbs`}
           icon={Scale}
           variant="primary"
-          trend={{ value: Math.abs(mockStats.weightChange), isPositive: mockStats.weightChange < 0 }}
+          trend={{ value: weightChangeAbs, isPositive: weightChangePositive }}
         />
         <StatCard
           title="Workouts Completed"
-          value={mockStats.workoutsCompleted}
+          value={stats?.workoutsCompleted ?? 0}
           subtitle="This month"
           icon={Dumbbell}
           variant="secondary"
         />
         <StatCard
           title="Diet Compliance"
-          value={`${mockStats.dietComplianceAverage}%`}
-          subtitle="Average this week"
+          value={`${stats?.dietComplianceAverage ?? 0}%`}
+          subtitle="Average"
           icon={Utensils}
           variant="accent"
         />
         <StatCard
           title="Days on Plan"
-          value={mockStats.daysOnPlan}
+          value={stats?.daysOnPlan ?? 0}
           subtitle="Keep it up!"
           icon={Calendar}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Today's Workout */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -102,17 +104,14 @@ export function ClientDashboard() {
               </CardTitle>
               <CardDescription>{mockTodayWorkout.name}</CardDescription>
             </div>
-            <Button size="sm" onClick={() => navigate('/my-plan')}>
+            <Button size="sm" onClick={() => navigate("/my-plan")}>
               Start Workout
             </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {mockTodayWorkout.exercises.map((exercise, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                >
+                <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                   <span className="font-medium">{exercise.name}</span>
                   <span className="text-sm text-muted-foreground">
                     {exercise.sets} × {exercise.reps}
@@ -123,7 +122,6 @@ export function ClientDashboard() {
           </CardContent>
         </Card>
 
-        {/* Today's Meals */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -131,21 +129,18 @@ export function ClientDashboard() {
                 <Utensils className="h-5 w-5 text-accent" />
                 Today's Meals
               </CardTitle>
-              <CardDescription>2,000 cal target</CardDescription>
+              <CardDescription>Target: coming in Sprint 3</CardDescription>
             </div>
-            <Button size="sm" variant="outline" onClick={() => navigate('/my-plan')}>
+            <Button size="sm" variant="outline" onClick={() => navigate("/my-plan")}>
               View Plan
             </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {mockTodayMeals.map((meal, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                >
+                <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                   <div className="flex items-center gap-3">
-                    {meal.status === 'completed' ? (
+                    {meal.status === "completed" ? (
                       <CheckCircle2 className="h-5 w-5 text-vitality" />
                     ) : (
                       <div className="h-5 w-5 rounded-full border-2 border-muted-foreground" />
@@ -163,14 +158,13 @@ export function ClientDashboard() {
         </Card>
       </div>
 
-      {/* Weekly Progress */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <TrendingUp className="h-5 w-5 text-primary" />
             This Week's Progress
           </CardTitle>
-          <CardDescription>Keep your streak going!</CardDescription>
+          <CardDescription>Streak system comes later</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex justify-between mb-4">
@@ -178,16 +172,10 @@ export function ClientDashboard() {
               <div key={index} className="flex flex-col items-center gap-2">
                 <div
                   className={`h-12 w-12 rounded-xl flex items-center justify-center ${
-                    day.completed
-                      ? 'bg-vitality text-vitality-foreground'
-                      : 'bg-muted text-muted-foreground'
+                    day.completed ? "bg-vitality text-vitality-foreground" : "bg-muted text-muted-foreground"
                   }`}
                 >
-                  {day.completed ? (
-                    <CheckCircle2 className="h-6 w-6" />
-                  ) : (
-                    <span className="text-sm font-medium">{day.day}</span>
-                  )}
+                  {day.completed ? <CheckCircle2 className="h-6 w-6" /> : <span className="text-sm font-medium">{day.day}</span>}
                 </div>
                 <span className="text-xs text-muted-foreground">{day.day}</span>
               </div>

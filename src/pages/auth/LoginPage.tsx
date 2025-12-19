@@ -16,11 +16,14 @@ const loginSchema = z.object({
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
+type SelectedRole = 'client' | 'coach';
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const { toast } = useToast();
+
+  const [selectedRole, setSelectedRole] = useState<SelectedRole>('client');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -32,10 +35,34 @@ export function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  const roleLabel = (r: SelectedRole) => (r === 'client' ? 'Client' : 'Coach');
+  const placeholder = selectedRole === 'coach' ? 'coach@fitcoach.com' : 'client1@fitcoach.com';
+
   const onSubmit = async (data: LoginFormData) => {
     try {
       setIsLoading(true);
-      await login(data.email, data.password);
+
+      const user = await login(data.email, data.password);
+
+      // Admin is allowed to login without explicit selector.
+      if (user.role === 'admin') {
+        navigate('/admin');
+        return;
+      }
+
+      // Block mismatch: logout immediately to clear token + storage
+      if (user.role !== selectedRole) {
+        await logout();
+
+        toast({
+          title: 'Login blocked',
+          description: `You selected ${roleLabel(selectedRole)} login, but this account is ${user.role.toUpperCase()}. Please switch role and try again.`,
+          variant: 'destructive',
+        });
+
+        return;
+      }
+
       navigate('/dashboard');
     } catch (error) {
       toast({
@@ -51,12 +78,22 @@ export function LoginPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-2 text-center lg:text-left">
-        <h2 className="text-2xl font-display font-bold text-foreground">
-          Welcome back
-        </h2>
-        <p className="text-muted-foreground">
-          Sign in to your account to continue
-        </p>
+        <h2 className="text-2xl font-display font-bold text-foreground">Welcome back</h2>
+        <p className="text-muted-foreground">Sign in to your account to continue</p>
+      </div>
+
+      {/* Role selector (Admin intentionally hidden) */}
+      <div className="grid grid-cols-2 gap-2">
+        {(['client', 'coach'] as const).map((r) => (
+          <Button
+            key={r}
+            type="button"
+            variant={selectedRole === r ? 'default' : 'outline'}
+            onClick={() => setSelectedRole(r)}
+          >
+            {roleLabel(r)}
+          </Button>
+        ))}
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -65,13 +102,11 @@ export function LoginPage() {
           <Input
             id="email"
             type="email"
-            placeholder="coach@example.com"
+            placeholder={placeholder}
             {...register('email')}
             className={errors.email ? 'border-destructive' : ''}
           />
-          {errors.email && (
-            <p className="text-sm text-destructive">{errors.email.message}</p>
-          )}
+          {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
         </div>
 
         <div className="space-y-2">
@@ -92,25 +127,16 @@ export function LoginPage() {
               {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          {errors.password && (
-            <p className="text-sm text-destructive">{errors.password.message}</p>
-          )}
+          {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
         </div>
 
         <div className="flex items-center justify-end">
-          <Link
-            to="/forgot-password"
-            className="text-sm text-primary hover:underline"
-          >
+          <Link to="/forgot-password" className="text-sm text-primary hover:underline">
             Forgot password?
           </Link>
         </div>
 
-        <Button
-          type="submit"
-          className="w-full shadow-energy"
-          disabled={isLoading}
-        >
+        <Button type="submit" className="w-full shadow-energy" disabled={isLoading}>
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

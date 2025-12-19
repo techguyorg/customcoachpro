@@ -21,10 +21,12 @@ public class JwtTokenService
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new(JwtRegisteredClaimNames.Email, user.Email),
             new(ClaimTypes.Role, user.Role),
-            new("fullName", user.FullName ?? "")
+            new("displayName", user.Profile?.DisplayName ?? "")
         };
+
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opts.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
