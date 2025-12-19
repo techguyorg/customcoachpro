@@ -22,6 +22,9 @@ import { ClientDetailPage } from "@/pages/clients/ClientDetailPage";
 import { NewClientPage } from "@/pages/clients/NewClientPage";
 import { CheckInsPage } from "@/pages/checkins/CheckInsPage";
 import { WorkoutPlansPage } from "@/pages/workouts/WorkoutPlansPage";
+import { CreateWorkoutPlanPage } from "@/pages/workouts/CreateWorkoutPlanPage";
+import { EditWorkoutPlanPage } from "@/pages/workouts/EditWorkoutPlanPage";
+import { AssignWorkoutPlanPage } from "@/pages/workouts/AssignWorkoutPlanPage";
 import { DietPlansPage } from "@/pages/diet/DietPlansPage";
 import { AnalyticsPage } from "@/pages/analytics/AnalyticsPage";
 
@@ -197,6 +200,30 @@ function AppRoutes() {
           element={
             <RoleRoute allowed={["coach"]}>
               <WorkoutPlansPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/workout-plans/new"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <CreateWorkoutPlanPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/workout-plans/:id/edit"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <EditWorkoutPlanPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/workout-plans/:id/assign"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <AssignWorkoutPlanPage />
             </RoleRoute>
           }
         />

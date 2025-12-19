@@ -14,6 +14,10 @@ public class AppDbContext : DbContext
     public DbSet<CoachClient> CoachClients => Set<CoachClient>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<CheckIn> CheckIns => Set<CheckIn>();
+    public DbSet<WorkoutPlan> WorkoutPlans => Set<WorkoutPlan>();
+    public DbSet<WorkoutDay> WorkoutDays => Set<WorkoutDay>();
+    public DbSet<WorkoutExercise> WorkoutExercises => Set<WorkoutExercise>();
+    public DbSet<ClientWorkoutPlan> ClientWorkoutPlans => Set<ClientWorkoutPlan>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -60,5 +64,27 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<CheckIn>()
             .Property(c => c.Status)
             .HasMaxLength(20);
+
+        modelBuilder.Entity<WorkoutPlan>()
+            .HasMany(p => p.Days)
+            .WithOne(d => d.WorkoutPlan)
+            .HasForeignKey(d => d.WorkoutPlanId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<WorkoutDay>()
+            .HasMany(d => d.Exercises)
+            .WithOne(e => e.WorkoutDay)
+            .HasForeignKey(e => e.WorkoutDayId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClientWorkoutPlan>()
+            .HasOne(c => c.WorkoutPlan)
+            .WithMany(p => p.Assignments)
+            .HasForeignKey(c => c.WorkoutPlanId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClientWorkoutPlan>()
+            .HasIndex(c => new { c.ClientId, c.WorkoutPlanId })
+            .IsUnique();
     }
 }

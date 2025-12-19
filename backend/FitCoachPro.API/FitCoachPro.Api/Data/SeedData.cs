@@ -103,6 +103,113 @@ public static class SeedData
         );
 
         var now = DateTime.UtcNow;
+        var strengthPlanId = Guid.NewGuid();
+        var strengthPlan = new WorkoutPlan
+        {
+            Id = strengthPlanId,
+            CoachId = coachId,
+            Name = "Beginner Strength",
+            Description = "A simple push/pull/legs rotation",
+            DurationWeeks = 4,
+            CreatedAt = now.AddDays(-21),
+            UpdatedAt = now.AddDays(-14),
+            Days =
+            {
+                new WorkoutDay
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Push Day",
+                    DayNumber = 1,
+                    Exercises =
+                    {
+                        new WorkoutExercise
+                        {
+                            Id = Guid.NewGuid(),
+                            ExerciseName = "Bench Press",
+                            Sets = 3,
+                            Reps = "8-10",
+                            RestSeconds = 120,
+                            Order = 1
+                        },
+                        new WorkoutExercise
+                        {
+                            Id = Guid.NewGuid(),
+                            ExerciseName = "Overhead Press",
+                            Sets = 3,
+                            Reps = "8-10",
+                            RestSeconds = 120,
+                            Order = 2
+                        }
+                    }
+                },
+                new WorkoutDay
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Pull Day",
+                    DayNumber = 2,
+                    Exercises =
+                    {
+                        new WorkoutExercise
+                        {
+                            Id = Guid.NewGuid(),
+                            ExerciseName = "Deadlift",
+                            Sets = 3,
+                            Reps = "5",
+                            RestSeconds = 180,
+                            Order = 1
+                        },
+                        new WorkoutExercise
+                        {
+                            Id = Guid.NewGuid(),
+                            ExerciseName = "Lat Pulldown",
+                            Sets = 3,
+                            Reps = "10-12",
+                            RestSeconds = 90,
+                            Order = 2
+                        }
+                    }
+                },
+                new WorkoutDay
+                {
+                    Id = Guid.NewGuid(),
+                    Name = "Leg Day",
+                    DayNumber = 3,
+                    Exercises =
+                    {
+                        new WorkoutExercise
+                        {
+                            Id = Guid.NewGuid(),
+                            ExerciseName = "Back Squat",
+                            Sets = 4,
+                            Reps = "6-8",
+                            RestSeconds = 180,
+                            Order = 1
+                        },
+                        new WorkoutExercise
+                        {
+                            Id = Guid.NewGuid(),
+                            ExerciseName = "Leg Press",
+                            Sets = 3,
+                            Reps = "10-12",
+                            RestSeconds = 120,
+                            Order = 2
+                        }
+                    }
+                }
+            }
+        };
+
+        db.WorkoutPlans.Add(strengthPlan);
+
+        db.ClientWorkoutPlans.Add(new ClientWorkoutPlan
+        {
+            Id = Guid.NewGuid(),
+            ClientId = c1Id,
+            WorkoutPlanId = strengthPlanId,
+            StartDate = now.Date.AddDays(-7),
+            IsActive = true
+        });
+
         db.CheckIns.AddRange(
             new CheckIn
             {

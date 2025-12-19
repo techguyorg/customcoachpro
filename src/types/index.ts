@@ -94,7 +94,8 @@ export interface Exercise {
 
 export interface WorkoutExercise {
   id: string;
-  exerciseId: string;
+  exerciseId?: string;
+  exerciseName?: string;
   exercise?: Exercise;
   sets: number;
   reps: string;
