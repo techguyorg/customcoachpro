@@ -5,6 +5,9 @@ import { API_BASE_URL } from "@/config/api";
 class ApiService {
   private baseUrl: string;
   private token: string | null = null;
+  private refreshHandler?: () => Promise<{ token: string } | { token: string | null } | string | null>;
+  private logoutHandler?: () => Promise<void> | void;
+  private refreshPromise: Promise<string | null> | null = null;
 
   constructor() {
     this.baseUrl = API_BASE_URL;
@@ -24,7 +27,62 @@ class ApiService {
     return this.token;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  setRefreshHandler(
+    handler: () => Promise<{ token: string } | { token: string | null } | string | null>
+  ) {
+    this.refreshHandler = handler;
+  }
+
+  setLogoutHandler(handler: () => Promise<void> | void) {
+    this.logoutHandler = handler;
+  }
+
+  private async tryRefreshToken(): Promise<string | null> {
+    if (!this.refreshHandler) return null;
+    if (!this.refreshPromise) {
+      this.refreshPromise = this.refreshHandler()
+        .then((result) => {
+          const token =
+            typeof result === "string"
+              ? result
+              : result?.token ?? null;
+
+          if (token) {
+            this.setToken(token);
+          }
+
+          return token;
+        })
+        .catch(() => null)
+        .finally(() => {
+          this.refreshPromise = null;
+        });
+    }
+
+    return this.refreshPromise;
+  }
+
+  private async handleUnauthorized() {
+    this.setToken(null);
+    localStorage.removeItem("refresh_token");
+
+    if (this.logoutHandler) {
+      await this.logoutHandler();
+      return;
+    }
+
+    window.location.href = "/login";
+  }
+
+  private async performFetch(url: string, headers: HeadersInit, options: RequestInit) {
+    try {
+      return await fetch(url, { ...options, headers });
+    } catch {
+      throw new Error("Network error: API is unreachable. Is the backend running?");
+    }
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}, hasRetried = false): Promise<T> {
     const url = `${this.baseUrl.replace(/\/$/, "")}/${endpoint.replace(/^\//, "")}`;
 
     const headers: HeadersInit = {
@@ -36,19 +94,25 @@ class ApiService {
       (headers as Record<string, string>)["Authorization"] = `Bearer ${this.token}`;
     }
 
-    let response: Response;
-    try {
-      response = await fetch(url, { ...options, headers });
-    } catch {
-      throw new Error("Network error: API is unreachable. Is the backend running?");
+    const response = await this.performFetch(url, headers, options);
+
+    if (response.status === 401 && !hasRetried) {
+      const refreshed = await this.tryRefreshToken();
+
+      if (refreshed) {
+        return this.request<T>(endpoint, options, true);
+      }
+
+      await this.handleUnauthorized();
+      throw new Error("Unauthorized");
+    }
+
+    if (response.status === 401) {
+      await this.handleUnauthorized();
+      throw new Error("Unauthorized");
     }
 
     if (!response.ok) {
-      if (response.status === 401) {
-        this.setToken(null);
-        window.location.href = "/login";
-      }
-
       const error = await response.json().catch(() => ({ message: "An error occurred" }));
       throw new Error(error.message || `HTTP error! status: ${response.status}`);
     }
