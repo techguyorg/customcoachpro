@@ -24,8 +24,10 @@ dist-ssr
 *.sw?
 
 # Backend build outputs
-backend/**/bin
-backend/**/obj
+backend\FitCoachPro.API\FitCoachPro.Api\bin*
+backend\FitCoachPro.API\FitCoachPro.Api\obj*
+backend/FitCoachPro.API/FitCoachPro.Api/bin*
+backend/FitCoachPro.API/FitCoachPro.Api/obj*
 
 # Env and local config
 .env
