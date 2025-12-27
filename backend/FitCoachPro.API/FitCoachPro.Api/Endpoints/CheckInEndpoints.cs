@@ -17,6 +17,7 @@ public static class CheckInEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
 
@@ -35,6 +36,7 @@ public static class CheckInEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
             var checkIn = await scoped.FirstOrDefaultAsync(c => c.Id == id);
@@ -50,6 +52,7 @@ public static class CheckInEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var type = (req.Type ?? string.Empty).Trim().ToLowerInvariant();
             if (!CheckInType.All.Contains(type))
@@ -113,6 +116,7 @@ public static class CheckInEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
             var checkIn = await scoped.FirstOrDefaultAsync(c => c.Id == id);
@@ -150,12 +154,24 @@ public static class CheckInEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role != "coach") return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
             var checkIn = await scoped.FirstOrDefaultAsync(c => c.Id == id);
             if (checkIn is null) return Results.NotFound();
 
             checkIn.Status = CheckInStatus.Reviewed;
+            db.AuditLogs.Add(new AuditLog
+            {
+                CoachId = checkIn.CoachId,
+                ActorId = userId.Value,
+                ClientId = checkIn.ClientId,
+                EntityId = checkIn.Id,
+                EntityType = "checkin",
+                Action = "reviewed",
+                Details = $"Reviewed {checkIn.Type} check-in"
+            });
+
             await db.SaveChangesAsync();
 
             var client = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == checkIn.ClientId);
@@ -177,6 +193,7 @@ public static class CheckInEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
             var checkIn = await scoped.FirstOrDefaultAsync(c => c.Id == id);

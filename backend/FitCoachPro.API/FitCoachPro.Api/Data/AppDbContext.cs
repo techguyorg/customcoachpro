@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<DietMeal> DietMeals => Set<DietMeal>();
     public DbSet<ClientDietPlan> ClientDietPlans => Set<ClientDietPlan>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -144,5 +145,16 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(n => n.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AuditLog>()
+            .Property(a => a.EntityType)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<AuditLog>()
+            .Property(a => a.Action)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<AuditLog>()
+            .Property(a => a.Details)
+            .HasMaxLength(512);
     }
 }
