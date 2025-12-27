@@ -24,18 +24,38 @@ public static class CoachEndpoints
                 .Join(db.Users.Include(u => u.Profile),
                     cc => cc.ClientId,
                     u => u.Id,
-                    (cc, u) => new
-                    {
-                        id = u.Id,
-                        email = u.Email,
-                        displayName = u.Profile!.DisplayName,
-                        startDate = u.Profile!.StartDate,
-                        currentWeight = u.Profile!.CurrentWeight,
-                        targetWeight = u.Profile!.TargetWeight
-                    })
+                    (cc, u) => new ClientListItem(
+                        u.Id,
+                        u.Email,
+                        u.Profile!.DisplayName,
+                        u.Profile!.StartDate,
+                        u.Profile!.CurrentWeight,
+                        u.Profile!.TargetWeight
+                    ))
                 .ToListAsync();
 
-            return Results.Ok(clients);
+            var clientIds = clients.Select(c => c.Id).ToList();
+            var checkIns = clientIds.Count == 0
+                ? new List<CheckIn>()
+                : await db.CheckIns
+                    .Where(ci => clientIds.Contains(ci.ClientId))
+                    .OrderByDescending(ci => ci.SubmittedAt)
+                    .ToListAsync();
+
+            var response = clients
+                .Select(client => new
+                {
+                    id = client.Id,
+                    email = client.Email,
+                    displayName = client.DisplayName,
+                    startDate = client.StartDate,
+                    currentWeight = client.CurrentWeight,
+                    targetWeight = client.TargetWeight,
+                    attentionReason = GetAttentionReason(client, checkIns)
+                })
+                .ToList();
+
+            return Results.Ok(response);
         });
 
         group.MapGet("/clients/{id:guid}", async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
@@ -190,6 +210,53 @@ public static class CoachEndpoints
         return Guid.TryParse(idStr, out var id) ? id : null;
     }
 
+    private static string? GetAttentionReason(ClientListItem client, IReadOnlyList<CheckIn> checkIns)
+    {
+        const decimal WeightRegressionThreshold = 1m;
+        const int ComplianceThreshold = 6;
+
+        var clientCheckIns = checkIns
+            .Where(ci => ci.ClientId == client.Id)
+            .OrderByDescending(ci => ci.SubmittedAt)
+            .ToList();
+
+        var weightCheckIns = clientCheckIns
+            .Where(ci => ci.Type == CheckInType.Weight && ci.Weight.HasValue)
+            .ToList();
+
+        var latestWeightCheckIn = weightCheckIns.FirstOrDefault();
+        var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
+
+        if (latestWeightCheckIn is null || latestWeightCheckIn.SubmittedAt < sevenDaysAgo)
+            return "Overdue weight check-in";
+
+        if (weightCheckIns.Count >= 2)
+        {
+            var latestWeight = weightCheckIns[0].Weight!.Value;
+            var previousWeight = weightCheckIns[1].Weight!.Value;
+
+            if (latestWeight - previousWeight >= WeightRegressionThreshold)
+                return "Weight regression";
+        }
+        else if (client.TargetWeight.HasValue
+                 && client.CurrentWeight.HasValue
+                 && client.CurrentWeight.Value - client.TargetWeight.Value >= WeightRegressionThreshold)
+        {
+            return "Weight regression";
+        }
+
+        var recentCompliance = clientCheckIns
+            .Where(ci => ci.Type == CheckInType.Diet && ci.DietCompliance.HasValue)
+            .Take(3)
+            .Select(ci => ci.DietCompliance!.Value)
+            .ToList();
+
+        if (recentCompliance.Any() && recentCompliance.Average() < ComplianceThreshold)
+            return "Low diet compliance";
+
+        return null;
+    }
+
     public record CreateClientRequest(
         string FirstName,
         string LastName,
@@ -210,6 +277,15 @@ public static class CoachEndpoints
         DateTime? StartDate,
         decimal? HeightCm,
         decimal? StartWeight,
+        decimal? CurrentWeight,
+        decimal? TargetWeight
+    );
+
+    private record ClientListItem(
+        Guid Id,
+        string Email,
+        string DisplayName,
+        DateTime? StartDate,
         decimal? CurrentWeight,
         decimal? TargetWeight
     );
