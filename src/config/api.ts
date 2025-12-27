@@ -102,4 +102,8 @@ export const API_ENDPOINTS = {
     coach: "/dashboard/coach",
     client: "/dashboard/client",
   },
+
+  analytics: {
+    base: "/analytics",
+  },
 } as const;
