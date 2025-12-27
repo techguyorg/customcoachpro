@@ -12,7 +12,7 @@ public static class ExerciseEndpoints
     {
         var group = app.MapGroup("/api/exercises").RequireAuthorization();
 
-        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db, string? search, string? muscle, string? tag, string? primaryMuscle) =>
+        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db, string? search, string? muscle, string? tag, string? primaryMuscle, string? equipment, string? difficulty) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
@@ -41,6 +41,16 @@ public static class ExerciseEndpoints
                 filtered = filtered.Where(e => e.PrimaryMuscleGroup.Equals(primaryMuscle, StringComparison.OrdinalIgnoreCase));
             }
 
+            if (!string.IsNullOrWhiteSpace(equipment))
+            {
+                filtered = filtered.Where(e => !string.IsNullOrWhiteSpace(e.Equipment) && e.Equipment.Contains(equipment, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(difficulty))
+            {
+                filtered = filtered.Where(e => MatchesDifficulty(e, difficulty));
+            }
+
             if (!string.IsNullOrWhiteSpace(tag))
             {
                 filtered = filtered.Where(e => Split(e.Tags).Any(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase)));
@@ -50,11 +60,13 @@ public static class ExerciseEndpoints
             var muscleGroups = exercises.SelectMany(e => Split(e.MuscleGroups)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(m => m);
             var primaryMuscles = exercises.Select(e => e.PrimaryMuscleGroup).Where(m => !string.IsNullOrWhiteSpace(m)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(m => m);
             var tags = exercises.SelectMany(e => Split(e.Tags)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t);
+            var equipments = exercises.Select(e => e.Equipment).Where(e => !string.IsNullOrWhiteSpace(e)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(e => e);
+            var difficulties = exercises.SelectMany(GetDifficultyTags).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(d => d);
 
             return Results.Ok(new
             {
                 data = list.Select(ToDto),
-                filters = new { muscleGroups, primaryMuscles, tags },
+                filters = new { muscleGroups, primaryMuscles, tags, equipment = equipments, difficulties },
                 success = true
             });
         });
@@ -208,6 +220,18 @@ public static class ExerciseEndpoints
         var idStr = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub");
         var role = principal.FindFirstValue(ClaimTypes.Role) ?? principal.FindFirstValue("role") ?? string.Empty;
         return (Guid.TryParse(idStr, out var uid) ? uid : null, role.ToLowerInvariant());
+    }
+
+    private static IEnumerable<string> GetDifficultyTags(Exercise exercise)
+    {
+        var knownLevels = new[] { "beginner", "intermediate", "advanced" };
+        var tags = Split(exercise.Tags);
+        return tags.Where(t => knownLevels.Contains(t, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static bool MatchesDifficulty(Exercise exercise, string difficulty)
+    {
+        return GetDifficultyTags(exercise).Any(t => t.Equals(difficulty, StringComparison.OrdinalIgnoreCase));
     }
 }
 

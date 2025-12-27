@@ -12,7 +12,7 @@ public static class WorkoutPlanEndpoints
     {
         var group = app.MapGroup("/api/workout-plans").RequireAuthorization();
 
-        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db) =>
+        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db, string? search, string? muscle, string? equipment, string? difficulty, string? tag, string? goal) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
@@ -21,7 +21,9 @@ public static class WorkoutPlanEndpoints
             var plans = await GetScopedPlans(db, userId.Value, role)
                 .ToListAsync();
 
-            return Results.Ok(new { data = plans.Select(ToDto), success = true });
+            var filtered = FilterWorkoutPlans(plans, search, muscle, equipment, difficulty, tag, goal);
+
+            return Results.Ok(new { data = filtered.Select(ToDto), success = true });
         });
 
         group.MapGet("/{id:guid}", async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
@@ -73,6 +75,56 @@ public static class WorkoutPlanEndpoints
                 .ToListAsync();
 
             return Results.Ok(new { data = assignments.Select(ToAssignmentDto), success = true });
+        });
+
+        var templateGroup = group.MapGroup("/templates").RequireAuthorization();
+
+        templateGroup.MapGet("/", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, string? search, string? muscle, string? equipment, string? difficulty, string? tag, string? goal) =>
+        {
+            var (coachId, role) = GetUser(principal);
+            if (coachId is null || role != "coach") return Results.Forbid();
+
+            var plans = await db.WorkoutPlans
+                .Include(p => p.Days)!.ThenInclude(d => d.Exercises)!.ThenInclude(e => e.Exercise)
+                .Where(p => p.IsPublished)
+                .ToListAsync();
+
+            var filtered = FilterWorkoutPlans(plans, search, muscle, equipment, difficulty, tag, goal);
+
+            return Results.Ok(new { data = filtered.Select(ToDto), success = true });
+        });
+
+        templateGroup.MapGet("/{id:guid}", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
+        {
+            var (coachId, role) = GetUser(principal);
+            if (coachId is null || role != "coach") return Results.Forbid();
+
+            var plan = await db.WorkoutPlans
+                .Include(p => p.Days)!.ThenInclude(d => d.Exercises)!.ThenInclude(e => e.Exercise)
+                .FirstOrDefaultAsync(p => p.Id == id && p.IsPublished);
+
+            if (plan is null) return Results.NotFound();
+
+            return Results.Ok(new { data = ToDto(plan), success = true });
+        });
+
+        templateGroup.MapPost("/{id:guid}/clone", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
+        {
+            var (coachId, role) = GetUser(principal);
+            if (coachId is null || role != "coach") return Results.Forbid();
+
+            var plan = await db.WorkoutPlans
+                .Include(p => p.Days)!.ThenInclude(d => d.Exercises)
+                .FirstOrDefaultAsync(p => p.Id == id && p.IsPublished);
+
+            if (plan is null) return Results.NotFound();
+
+            var duplicate = DuplicatePlan(plan, coachId.Value);
+
+            db.WorkoutPlans.Add(duplicate);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new { data = ToDto(duplicate), success = true });
         });
 
         group.MapPost("/", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, CreateWorkoutPlanRequest req) =>
@@ -252,12 +304,54 @@ public static class WorkoutPlanEndpoints
         });
     }
 
+    private static IEnumerable<WorkoutPlan> FilterWorkoutPlans(IEnumerable<WorkoutPlan> plans, string? search, string? muscle, string? equipment, string? difficulty, string? tag, string? goal)
+    {
+        var filtered = plans.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filtered = filtered.Where(p =>
+                p.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrWhiteSpace(p.Description) && p.Description.Contains(search, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(muscle))
+        {
+            filtered = filtered.Where(p => PlanExercises(p).Any(e =>
+                e.PrimaryMuscleGroup.Equals(muscle, StringComparison.OrdinalIgnoreCase) ||
+                SplitCsv(e.MuscleGroups).Any(m => m.Equals(muscle, StringComparison.OrdinalIgnoreCase))));
+        }
+
+        if (!string.IsNullOrWhiteSpace(equipment))
+        {
+            filtered = filtered.Where(p => PlanExercises(p).Any(e => !string.IsNullOrWhiteSpace(e.Equipment) && e.Equipment.Contains(equipment, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(difficulty))
+        {
+            filtered = filtered.Where(p => ExtractDifficultyTags(p).Any(d => d.Equals(difficulty, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(tag))
+        {
+            filtered = filtered.Where(p => ExtractPlanTags(p).Any(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(goal))
+        {
+            filtered = filtered.Where(p => InferWorkoutGoal(p).Equals(goal, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return filtered;
+    }
+
     private static WorkoutPlanDto ToDto(WorkoutPlan plan) => new(
         plan.Id,
         plan.CoachId,
         plan.CreatedBy,
         plan.Name,
         plan.Description,
+        InferWorkoutGoal(plan),
         plan.DurationWeeks,
         plan.IsPublished,
         plan.CreatedAt,
@@ -329,7 +423,7 @@ public static class WorkoutPlanEndpoints
         {
             Id = Guid.NewGuid(),
             CoachId = coachId,
-            CreatedBy = plan.CreatedBy == Guid.Empty ? coachId : plan.CreatedBy,
+            CreatedBy = coachId,
             Name = $"{plan.Name} (Copy)",
             Description = plan.Description,
             DurationWeeks = plan.DurationWeeks,
@@ -411,6 +505,41 @@ public static class WorkoutPlanEndpoints
                 exercise.CreatedAt,
                 exercise.UpdatedAt);
 
+    private static IEnumerable<Exercise> PlanExercises(WorkoutPlan plan) =>
+        plan.Days
+            .SelectMany(d => d.Exercises)
+            .Where(e => e.Exercise is not null)
+            .Select(e => e.Exercise!);
+
+    private static IEnumerable<string> ExtractPlanTags(WorkoutPlan plan) =>
+        PlanExercises(plan)
+            .SelectMany(e => SplitCsv(e.Tags))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    private static IEnumerable<string> ExtractDifficultyTags(WorkoutPlan plan) =>
+        PlanExercises(plan)
+            .SelectMany(GetDifficultyTags)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+    private static IEnumerable<string> GetDifficultyTags(Exercise exercise)
+    {
+        var knownLevels = new[] { "beginner", "intermediate", "advanced" };
+        return SplitCsv(exercise.Tags).Where(t => knownLevels.Contains(t, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static string InferWorkoutGoal(WorkoutPlan plan)
+    {
+        var tags = ExtractPlanTags(plan);
+        var description = plan.Description ?? string.Empty;
+        if (tags.Any(t => t.Contains("gain", StringComparison.OrdinalIgnoreCase)) || description.Contains("gain", StringComparison.OrdinalIgnoreCase))
+            return "muscle-gain";
+        if (tags.Any(t => t.Contains("loss", StringComparison.OrdinalIgnoreCase) || t.Contains("cut", StringComparison.OrdinalIgnoreCase)) ||
+            description.Contains("loss", StringComparison.OrdinalIgnoreCase) ||
+            description.Contains("cut", StringComparison.OrdinalIgnoreCase))
+            return "fat-loss";
+        return "general";
+    }
+
     private static async Task<(Dictionary<Guid, Exercise> Lookup, IResult? Error)> ValidateExercises(
         AppDbContext db,
         Guid coachId,
@@ -454,5 +583,5 @@ public record AssignWorkoutPlanRequest(Guid ClientId, Guid WorkoutPlanId, DateTi
 
 public record WorkoutExerciseDto(Guid Id, Guid? ExerciseId, string? ExerciseName, int Sets, string Reps, int RestSeconds, string? Tempo, string? Notes, int Order, ExerciseDto? Exercise);
 public record WorkoutDayDto(Guid Id, string Name, int DayNumber, List<WorkoutExerciseDto> Exercises);
-public record WorkoutPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, int DurationWeeks, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt, List<WorkoutDayDto> Days);
+public record WorkoutPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, string Goal, int DurationWeeks, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt, List<WorkoutDayDto> Days);
 public record ClientWorkoutPlanDto(Guid Id, Guid ClientId, Guid WorkoutPlanId, DateTime StartDate, DateTime? EndDate, bool IsActive);
