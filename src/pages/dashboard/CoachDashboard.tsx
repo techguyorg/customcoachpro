@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -50,12 +51,13 @@ export function CoachDashboard() {
   };
 
   // Keep demo widgets but use real client list as "recent"
-  const recentClients = (clients ?? []).slice(0, 4).map((c, idx) => ({
+  const recentClients = (clients ?? []).slice(0, 4).map((c) => ({
     id: c.id,
     displayName: c.displayName,
     avatarUrl: "",
     lastCheckIn: "—",
-    status: idx % 3 === 0 ? "needs-attention" : "on-track",
+    status: c.attentionReason ? "needs-attention" : "on-track",
+    attentionReason: c.attentionReason,
   }));
 
   const pendingCheckIns = [
@@ -175,7 +177,16 @@ export function CoachDashboard() {
                         <p className="text-sm text-muted-foreground">Last check-in: {client.lastCheckIn}</p>
                       </div>
                     </div>
-                    {getStatusBadge(client.status)}
+                    {client.attentionReason ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>{getStatusBadge(client.status)}</TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-sm">{client.attentionReason}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      getStatusBadge(client.status)
+                    )}
                   </div>
                 ))
               )}

@@ -8,6 +8,7 @@ export type CoachClientListItem = {
   startDate?: string;
   currentWeight?: number;
   targetWeight?: number;
+  attentionReason?: string | null;
 };
 
 export type CoachClientDetail = {
