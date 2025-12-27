@@ -1,0 +1,55 @@
+[
+  {
+    "name": "Bodyweight Squat",
+    "primaryMuscleGroup": "Quads",
+    "description": "Controlled tempo squat focusing on depth and balance.",
+    "muscleGroups": ["Quads", "Glutes", "Core"],
+    "tags": ["bodyweight", "beginner", "legs"],
+    "equipment": "None",
+    "videoUrl": "https://www.youtube.com/watch?v=aclHkVaku9U"
+  },
+  {
+    "name": "Incline Push-Up",
+    "primaryMuscleGroup": "Chest",
+    "description": "Hands on elevated surface to build pressing strength.",
+    "muscleGroups": ["Chest", "Triceps", "Shoulders"],
+    "tags": ["bodyweight", "push", "beginner"],
+    "equipment": "Box or bench",
+    "videoUrl": "https://www.youtube.com/watch?v=8wVv44NqVQ4"
+  },
+  {
+    "name": "Dumbbell Romanian Deadlift",
+    "primaryMuscleGroup": "Hamstrings",
+    "description": "Hip hinge pattern to strengthen posterior chain.",
+    "muscleGroups": ["Hamstrings", "Glutes", "Back"],
+    "tags": ["dumbbell", "hinge", "strength"],
+    "equipment": "Dumbbells",
+    "videoUrl": "https://www.youtube.com/watch?v=7j-2b2ZFw5c"
+  },
+  {
+    "name": "Seated Cable Row",
+    "primaryMuscleGroup": "Back",
+    "description": "Neutral grip row for mid-back development.",
+    "muscleGroups": ["Back", "Biceps"],
+    "tags": ["cable", "pull", "strength"],
+    "equipment": "Cable row",
+    "videoUrl": "https://www.youtube.com/watch?v=GZbfZ033f74"
+  },
+  {
+    "name": "Glute Bridge",
+    "primaryMuscleGroup": "Glutes",
+    "description": "Posterior chain activation with hips driving up.",
+    "muscleGroups": ["Glutes", "Hamstrings", "Core"],
+    "tags": ["bodyweight", "bridge", "activation"],
+    "equipment": "None",
+    "videoUrl": "https://www.youtube.com/watch?v=m2Zx-57aTqQ"
+  },
+  {
+    "name": "Plank",
+    "primaryMuscleGroup": "Core",
+    "description": "Iso-hold focusing on neutral spine and breathing.",
+    "muscleGroups": ["Core", "Shoulders"],
+    "tags": ["core", "isometric", "bodyweight"],
+    "equipment": "Mat"
+  }
+]

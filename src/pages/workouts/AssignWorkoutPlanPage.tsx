@@ -18,6 +18,7 @@ export function AssignWorkoutPlanPage() {
 
   const [selectedClientId, setSelectedClientId] = useState("");
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [durationDays, setDurationDays] = useState("");
 
   const { data: plan } = useQuery({
     queryKey: ["workout-plan", id],
@@ -36,6 +37,7 @@ export function AssignWorkoutPlanPage() {
         clientId: selectedClientId,
         workoutPlanId: id!,
         startDate: new Date(startDate).toISOString(),
+        durationDays: durationDays ? Number(durationDays) : undefined,
       }),
     onSuccess: () => {
       toast({ title: "Workout plan assigned" });
@@ -109,6 +111,19 @@ export function AssignWorkoutPlanPage() {
             <div className="space-y-2">
               <Label htmlFor="startDate">Start date</Label>
               <Input id="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="durationDays">Duration (days)</Label>
+              <Input
+                id="durationDays"
+                type="number"
+                min={1}
+                placeholder="Optional"
+                value={durationDays}
+                onChange={(e) => setDurationDays(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Set how long the plan should run. Leave blank for open-ended.</p>
             </div>
 
             <div className="flex justify-end gap-3">

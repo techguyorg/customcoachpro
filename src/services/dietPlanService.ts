@@ -31,12 +31,16 @@ export type AssignDietPlanPayload = {
   clientId: string;
   dietPlanId: string;
   startDate: string;
+  durationDays?: number;
 };
 
 export type DietPlanTemplate = {
+  id?: string;
   name: string;
   description: string;
   payload: DietPlanPayload;
+  source?: "system" | "coach";
+  coachId?: string;
 };
 
 const dietPlanService = {
