@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FitCoachPro.Api.Data;
 using FitCoachPro.Api.Models;
+using FitCoachPro.Api.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,10 +13,13 @@ public static class CheckInEndpoints
     {
         var group = app.MapGroup("/api/checkins").RequireAuthorization();
 
+        group.MapGet("/", (ClaimsPrincipal principal, AppDbContext db, string? status, string? type, Guid? coachId) =>
+            GetCheckIns(principal, db, status, type, coachId));
         group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
 
@@ -27,13 +31,14 @@ public static class CheckInEndpoints
                     (c, u) => ToDto(c, u))
                 .ToListAsync();
 
-            return Results.Ok(results);
-        });
+        group.MapGet("/pending", (ClaimsPrincipal principal, AppDbContext db, string? type, Guid? coachId) =>
+            GetCheckIns(principal, db, CheckInStatus.Pending, type, coachId));
 
         group.MapGet("/{id:guid}", async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
             var checkIn = await scoped.FirstOrDefaultAsync(c => c.Id == id);
@@ -45,10 +50,11 @@ public static class CheckInEndpoints
             return Results.Ok(ToDto(checkIn, client));
         });
 
-        group.MapPost("/", async (ClaimsPrincipal principal, AppDbContext db, CreateCheckInRequest req) =>
+        group.MapPost("/", async (ClaimsPrincipal principal, AppDbContext db, CreateCheckInRequest req, INotificationQueue notifications) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var type = (req.Type ?? string.Empty).Trim().ToLowerInvariant();
             if (!CheckInType.All.Contains(type))
@@ -87,6 +93,24 @@ public static class CheckInEndpoints
             var client = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == checkIn.ClientId);
             if (client is null) return Results.NotFound(new { message = "Client not found" });
 
+            // Notify the coach when a client submits a check-in
+            if (checkIn.CoachId != Guid.Empty)
+            {
+                var coach = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == checkIn.CoachId);
+                if (coach is not null)
+                {
+                    var clientName = client.Profile?.DisplayName ?? client.Email;
+                    await notifications.EnqueueAsync(new NotificationEvent(
+                        coach.Id,
+                        "New check-in submitted",
+                        $"{clientName} sent a {checkIn.Type} check-in.",
+                        "check-in",
+                        "/check-ins",
+                        coach.Email
+                    ));
+                }
+            }
+
             return Results.Ok(ToDto(checkIn, client));
         });
 
@@ -94,6 +118,7 @@ public static class CheckInEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
             var checkIn = await scoped.FirstOrDefaultAsync(c => c.Id == id);
@@ -127,20 +152,41 @@ public static class CheckInEndpoints
             return Results.Ok(ToDto(checkIn, client));
         });
 
-        group.MapPut("/{id:guid}/review", async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
+        group.MapPut("/{id:guid}/review", async (ClaimsPrincipal principal, AppDbContext db, Guid id, INotificationQueue notifications) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role != "coach") return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
             var checkIn = await scoped.FirstOrDefaultAsync(c => c.Id == id);
             if (checkIn is null) return Results.NotFound();
 
             checkIn.Status = CheckInStatus.Reviewed;
+            db.AuditLogs.Add(new AuditLog
+            {
+                CoachId = checkIn.CoachId,
+                ActorId = userId.Value,
+                ClientId = checkIn.ClientId,
+                EntityId = checkIn.Id,
+                EntityType = "checkin",
+                Action = "reviewed",
+                Details = $"Reviewed {checkIn.Type} check-in"
+            });
+
             await db.SaveChangesAsync();
 
             var client = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == checkIn.ClientId);
             if (client is null) return Results.NotFound(new { message = "Client not found" });
+
+            await notifications.EnqueueAsync(new NotificationEvent(
+                client.Id,
+                "Check-in reviewed",
+                "Your coach reviewed your check-in.",
+                "check-in",
+                "/progress",
+                client.Email
+            ));
 
             return Results.Ok(ToDto(checkIn, client));
         });
@@ -149,6 +195,7 @@ public static class CheckInEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var scoped = ApplyScope(db, userId.Value, role);
             var checkIn = await scoped.FirstOrDefaultAsync(c => c.Id == id);
@@ -183,6 +230,50 @@ public static class CheckInEndpoints
         }
 
         return query;
+    }
+
+    private static async Task<IResult> GetCheckIns(
+        ClaimsPrincipal principal,
+        AppDbContext db,
+        string? status,
+        string? type,
+        Guid? coachId)
+    {
+        var (userId, role) = GetUser(principal);
+        if (userId is null) return Results.Unauthorized();
+
+        var scoped = ApplyScope(db, userId.Value, role);
+
+        if (coachId.HasValue)
+            scoped = scoped.Where(c => c.CoachId == coachId.Value);
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var normalized = status.Trim().ToLowerInvariant();
+            if (normalized is not (CheckInStatus.Pending or CheckInStatus.Reviewed))
+                return Results.BadRequest(new { message = "Invalid status" });
+
+            scoped = scoped.Where(c => c.Status == normalized);
+        }
+
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            var normalizedType = type.Trim().ToLowerInvariant();
+            if (!CheckInType.All.Contains(normalizedType))
+                return Results.BadRequest(new { message = "Invalid check-in type" });
+
+            scoped = scoped.Where(c => c.Type == normalizedType);
+        }
+
+        var results = await scoped
+            .OrderByDescending(c => c.SubmittedAt)
+            .Join(db.Users.Include(u => u.Profile),
+                c => c.ClientId,
+                u => u.Id,
+                (c, u) => ToDto(c, u))
+            .ToListAsync();
+
+        return Results.Ok(results);
     }
 
     private static void ApplyRequest(CheckIn checkIn, UpsertCheckInRequest req)

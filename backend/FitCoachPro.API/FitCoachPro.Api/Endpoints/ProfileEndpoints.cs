@@ -30,8 +30,13 @@ public static class ProfileEndpoints
                     bio = user.Profile?.Bio,
                     avatarUrl = user.Profile?.AvatarUrl,
 
+                    preferredUnitSystem = user.Profile?.PreferredUnitSystem ?? "imperial",
                     startDate = user.Profile?.StartDate,
                     heightCm = user.Profile?.HeightCm,
+                    neckCm = user.Profile?.NeckCm,
+                    armsCm = user.Profile?.ArmsCm,
+                    quadsCm = user.Profile?.QuadsCm,
+                    hipsCm = user.Profile?.HipsCm,
                     currentWeight = user.Profile?.CurrentWeight,
                     targetWeight = user.Profile?.TargetWeight
                 }
@@ -55,9 +60,17 @@ public static class ProfileEndpoints
             user.Profile.Bio = req.Bio;
             user.Profile.AvatarUrl = req.AvatarUrl;
 
+            user.Profile.PreferredUnitSystem = string.IsNullOrWhiteSpace(req.PreferredUnitSystem)
+                ? user.Profile.PreferredUnitSystem
+                : req.PreferredUnitSystem.Trim().ToLowerInvariant();
+
             // Client fields (safe even if coach)
             user.Profile.StartDate = req.StartDate;
             user.Profile.HeightCm = req.HeightCm;
+            user.Profile.NeckCm = req.NeckCm;
+            user.Profile.ArmsCm = req.ArmsCm;
+            user.Profile.QuadsCm = req.QuadsCm;
+            user.Profile.HipsCm = req.HipsCm;
             user.Profile.CurrentWeight = req.CurrentWeight;
             user.Profile.TargetWeight = req.TargetWeight;
 
@@ -73,8 +86,13 @@ public static class ProfileEndpoints
                     displayName = user.Profile?.DisplayName ?? user.Email,
                     bio = user.Profile?.Bio,
                     avatarUrl = user.Profile?.AvatarUrl,
+                    preferredUnitSystem = user.Profile?.PreferredUnitSystem ?? "imperial",
                     startDate = user.Profile?.StartDate,
                     heightCm = user.Profile?.HeightCm,
+                    neckCm = user.Profile?.NeckCm,
+                    armsCm = user.Profile?.ArmsCm,
+                    quadsCm = user.Profile?.QuadsCm,
+                    hipsCm = user.Profile?.HipsCm,
                     currentWeight = user.Profile?.CurrentWeight,
                     targetWeight = user.Profile?.TargetWeight
                 }
@@ -95,8 +113,13 @@ public static class ProfileEndpoints
         string DisplayName,
         string? Bio,
         string? AvatarUrl,
+        string? PreferredUnitSystem,
         DateTime? StartDate,
         decimal? HeightCm,
+        decimal? NeckCm,
+        decimal? ArmsCm,
+        decimal? QuadsCm,
+        decimal? HipsCm,
         decimal? CurrentWeight,
         decimal? TargetWeight
     );

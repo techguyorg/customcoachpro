@@ -26,6 +26,7 @@ import {
   Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
 const coachNavItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -112,6 +113,8 @@ export function AppLayout() {
                 {viewMode === "client" ? "View as Coach" : "View as Client"}
               </Button>
             )}
+
+            <NotificationsBell />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

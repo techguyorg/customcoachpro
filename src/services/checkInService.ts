@@ -70,6 +70,12 @@ export type UpdateCheckInPayload = Partial<CreateCheckInPayload> & {
   status?: CheckInStatus;
 };
 
+export type CheckInFilters = {
+  status?: CheckInStatus;
+  type?: CheckInType;
+  coachId?: string;
+};
+
 type CheckInApi = {
   id: string;
   clientId: string;
@@ -153,6 +159,17 @@ const checkInService = {
 
   async getCheckIns(params?: CheckInQueryParams): Promise<CheckIn[]> {
     const endpoint = `${API_ENDPOINTS.checkIns.base}${this.buildQueryString(params)}`;
+  async getCheckIns(filters?: CheckInFilters): Promise<CheckIn[]> {
+    const params = new URLSearchParams();
+
+    if (filters?.status) params.append("status", filters.status);
+    if (filters?.type) params.append("type", filters.type);
+    if (filters?.coachId) params.append("coachId", filters.coachId);
+
+    const endpoint = params.toString()
+      ? `${API_ENDPOINTS.checkIns.base}?${params.toString()}`
+      : API_ENDPOINTS.checkIns.base;
+
     const response = await apiService.get<CheckInApi[]>(endpoint);
     return response.map(toDomain);
   },

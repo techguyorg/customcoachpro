@@ -25,6 +25,8 @@ public class AppDbContext : DbContext
     public DbSet<DietDay> DietDays => Set<DietDay>();
     public DbSet<DietMeal> DietMeals => Set<DietMeal>();
     public DbSet<ClientDietPlan> ClientDietPlans => Set<ClientDietPlan>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -133,5 +135,26 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ClientDietPlan>()
             .HasIndex(c => new { c.ClientId, c.DietPlanId })
             .IsUnique();
+
+        modelBuilder.Entity<Notification>()
+            .Property(n => n.Type)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<Notification>()
+            .HasOne(n => n.User)
+            .WithMany()
+            .HasForeignKey(n => n.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<AuditLog>()
+            .Property(a => a.EntityType)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<AuditLog>()
+            .Property(a => a.Action)
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<AuditLog>()
+            .Property(a => a.Details)
+            .HasMaxLength(512);
     }
 }

@@ -1,5 +1,6 @@
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Mail, Calendar, Target, Scale, TrendingDown, Edit } from "lucide-react";
+import { ArrowLeft, Mail, Calendar, Target, Scale, TrendingDown, Edit, Ruler } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -9,9 +10,26 @@ import { Progress } from "@/components/ui/progress";
 import { useQuery } from "@tanstack/react-query";
 import coachService from "@/services/coachService";
 
+type UnitSystem = "imperial" | "metric";
+
+const INCH_TO_CM = 2.54;
+const LB_TO_KG = 0.45359237;
+
+const convertWeight = (value: number | undefined, from: UnitSystem, to: UnitSystem) => {
+  if (value === undefined || Number.isNaN(value)) return 0;
+  if (from === to) return value;
+  return from === "imperial" ? Number((value * LB_TO_KG).toFixed(1)) : Number((value / LB_TO_KG).toFixed(1));
+};
+
+const convertLength = (value: number | undefined, to: UnitSystem) => {
+  if (value === undefined || Number.isNaN(value)) return undefined;
+  return to === "imperial" ? Number((value / INCH_TO_CM).toFixed(1)) : Number(value.toFixed(1));
+};
+
 export function ClientDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>("imperial");
 
   const clientId = id ?? "";
 
@@ -20,6 +38,15 @@ export function ClientDetailPage() {
     queryFn: () => coachService.getClient(clientId),
     enabled: !!clientId,
   });
+
+  useEffect(() => {
+    if (data?.profile?.preferredUnitSystem === "metric") {
+      setUnitSystem("metric");
+    }
+  }, [data?.profile?.preferredUnitSystem]);
+
+  const weightUnit = useMemo(() => (unitSystem === "imperial" ? "lbs" : "kg"), [unitSystem]);
+  const lengthUnit = useMemo(() => (unitSystem === "imperial" ? "in" : "cm"), [unitSystem]);
 
   if (isLoading) {
     return (
@@ -46,9 +73,16 @@ export function ClientDetailPage() {
   const profile = data.profile;
   const displayName = profile.displayName || data.email;
 
-  const currentWeight = Number(profile.currentWeight ?? 0);
-  const startWeight = Number(profile.startWeight ?? profile.currentWeight ?? 0);
-  const targetWeight = Number(profile.targetWeight ?? 0);
+  const storedWeightUnit = (profile.preferredUnitSystem as UnitSystem | undefined) ?? "imperial";
+  const currentWeight = convertWeight(profile.currentWeight ?? undefined, storedWeightUnit, unitSystem);
+  const startWeight = convertWeight(profile.startWeight ?? profile.currentWeight ?? undefined, storedWeightUnit, unitSystem);
+  const targetWeight = convertWeight(profile.targetWeight ?? undefined, storedWeightUnit, unitSystem);
+
+  const height = convertLength(profile.heightCm ?? undefined, unitSystem);
+  const neck = convertLength(profile.neckCm ?? undefined, unitSystem);
+  const arms = convertLength(profile.armsCm ?? undefined, unitSystem);
+  const quads = convertLength(profile.quadsCm ?? undefined, unitSystem);
+  const hips = convertLength(profile.hipsCm ?? undefined, unitSystem);
 
   const weightLost = Math.max(0, startWeight - currentWeight);
   const totalToLose = Math.max(0, startWeight - targetWeight);
@@ -82,6 +116,15 @@ export function ClientDetailPage() {
         </div>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant={unitSystem === "imperial" ? "default" : "outline"} onClick={() => setUnitSystem("imperial")}>
+          Imperial (lbs/in)
+        </Button>
+        <Button type="button" variant={unitSystem === "metric" ? "default" : "outline"} onClick={() => setUnitSystem("metric")}>
+          Metric (kg/cm)
+        </Button>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
@@ -91,7 +134,9 @@ export function ClientDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Current Weight</p>
-                <p className="text-xl font-bold">{currentWeight || 0} lbs</p>
+                <p className="text-xl font-bold">
+                  {currentWeight || 0} {weightUnit}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -105,7 +150,9 @@ export function ClientDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Target Weight</p>
-                <p className="text-xl font-bold">{targetWeight || 0} lbs</p>
+                <p className="text-xl font-bold">
+                  {targetWeight || 0} {weightUnit}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -119,7 +166,9 @@ export function ClientDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Weight Lost</p>
-                <p className="text-xl font-bold">{weightLost} lbs</p>
+                <p className="text-xl font-bold">
+                  {weightLost} {weightUnit}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -146,7 +195,7 @@ export function ClientDetailPage() {
         <CardHeader>
           <CardTitle className="text-lg">Goal Progress</CardTitle>
           <CardDescription>
-            {weightLost} of {totalToLose} lbs to goal
+            {weightLost} of {totalToLose} {weightUnit} to goal
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -164,7 +213,7 @@ export function ClientDetailPage() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-3">
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Goals</CardTitle>
@@ -180,6 +229,22 @@ export function ClientDetailPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">Notes feature comes later (Sprint 3).</p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Ruler className="h-4 w-4 text-muted-foreground" />
+                  Measurements
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p>Height: {height !== undefined ? `${height} ${lengthUnit}` : "—"}</p>
+                <p>Neck: {neck !== undefined ? `${neck} ${lengthUnit}` : "—"}</p>
+                <p>Arms: {arms !== undefined ? `${arms} ${lengthUnit}` : "—"}</p>
+                <p>Quads: {quads !== undefined ? `${quads} ${lengthUnit}` : "—"}</p>
+                <p>Hips: {hips !== undefined ? `${hips} ${lengthUnit}` : "—"}</p>
               </CardContent>
             </Card>
           </div>
