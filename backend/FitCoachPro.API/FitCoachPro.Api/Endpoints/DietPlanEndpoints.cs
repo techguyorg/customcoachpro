@@ -55,7 +55,7 @@ public static class DietPlanEndpoints
             if (userId is null || role != "coach" || userId != coachId) return Results.Forbid();
 
             var foods = await db.Foods
-                .Where(f => f.CoachId == coachId)
+                .Where(f => f.CoachId == coachId || f.IsPublished)
                 .OrderBy(f => f.Name)
                 .ToListAsync();
 
@@ -74,13 +74,15 @@ public static class DietPlanEndpoints
             {
                 Id = Guid.NewGuid(),
                 CoachId = coachId.Value,
+                CreatedBy = coachId.Value,
                 Name = req.Name.Trim(),
                 Calories = Math.Max(req.Calories, 0),
                 Protein = Math.Max(req.Protein, 0),
                 Carbs = Math.Max(req.Carbs, 0),
                 Fat = Math.Max(req.Fat, 0),
                 ServingSize = string.IsNullOrWhiteSpace(req.ServingSize) ? "1 serving" : req.ServingSize.Trim(),
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = DateTime.UtcNow,
+                IsPublished = req.IsPublished ?? false
             };
 
             db.Foods.Add(food);
@@ -103,6 +105,7 @@ public static class DietPlanEndpoints
             if (req.Carbs.HasValue) food.Carbs = Math.Max(req.Carbs.Value, 0);
             if (req.Fat.HasValue) food.Fat = Math.Max(req.Fat.Value, 0);
             if (req.ServingSize is not null) food.ServingSize = string.IsNullOrWhiteSpace(req.ServingSize) ? "1 serving" : req.ServingSize.Trim();
+            if (req.IsPublished.HasValue) food.IsPublished = req.IsPublished.Value;
 
             await db.SaveChangesAsync();
 
@@ -160,7 +163,7 @@ public static class DietPlanEndpoints
 
             var meals = await db.Meals
                 .Include(m => m.Foods).ThenInclude(f => f.Food)
-                .Where(m => m.CoachId == coachId)
+                .Where(m => m.CoachId == coachId || m.IsPublished)
                 .OrderBy(m => m.Name)
                 .ToListAsync();
 
@@ -179,7 +182,7 @@ public static class DietPlanEndpoints
             if (!foodIds.Any())
                 return Results.BadRequest(new { message = "At least one food is required" });
 
-            var foods = await db.Foods.Where(f => f.CoachId == coachId && foodIds.Contains(f.Id)).ToListAsync();
+            var foods = await db.Foods.Where(f => foodIds.Contains(f.Id) && (f.CoachId == coachId || f.IsPublished)).ToListAsync();
             if (foods.Count != foodIds.Count)
                 return Results.BadRequest(new { message = "One or more foods were not found for this coach" });
 
@@ -187,8 +190,10 @@ public static class DietPlanEndpoints
             {
                 Id = Guid.NewGuid(),
                 CoachId = coachId.Value,
+                CreatedBy = coachId.Value,
                 Name = req.Name.Trim(),
                 Description = req.Description?.Trim(),
+                IsPublished = req.IsPublished ?? false,
                 Foods = req.Foods!.Select(f => new MealFood
                 {
                     Id = Guid.NewGuid(),
@@ -217,6 +222,7 @@ public static class DietPlanEndpoints
 
             if (!string.IsNullOrWhiteSpace(req.Name)) meal.Name = req.Name.Trim();
             if (req.Description is not null) meal.Description = req.Description.Trim();
+            if (req.IsPublished.HasValue) meal.IsPublished = req.IsPublished.Value;
 
             if (req.Foods is not null)
             {
@@ -224,7 +230,7 @@ public static class DietPlanEndpoints
                 if (!foodIds.Any())
                     return Results.BadRequest(new { message = "At least one food is required" });
 
-                var foods = await db.Foods.Where(f => f.CoachId == coachId && foodIds.Contains(f.Id)).ToListAsync();
+                var foods = await db.Foods.Where(f => foodIds.Contains(f.Id) && (f.CoachId == coachId || f.IsPublished)).ToListAsync();
                 if (foods.Count != foodIds.Count)
                     return Results.BadRequest(new { message = "One or more foods were not found for this coach" });
 
@@ -310,7 +316,7 @@ public static class DietPlanEndpoints
 
             var meals = await db.Meals
                 .Include(m => m.Foods)!.ThenInclude(f => f.Food)
-                .Where(m => m.CoachId == coachId)
+                .Where(m => m.CoachId == coachId || m.IsPublished)
                 .OrderBy(m => m.Name)
                 .ToListAsync();
 
@@ -352,7 +358,7 @@ public static class DietPlanEndpoints
                 return Results.BadRequest(new { message = "At least one day is required" });
 
             var mealIds = req.Days.SelectMany(d => d.Meals ?? new List<DietMealRequest>()).Select(m => m.MealId).ToList();
-            var meals = await db.Meals.Where(m => m.CoachId == coachId && mealIds.Contains(m.Id)).ToListAsync();
+            var meals = await db.Meals.Where(m => mealIds.Contains(m.Id) && (m.CoachId == coachId || m.IsPublished)).ToListAsync();
             if (mealIds.Any() && meals.Count != mealIds.Count)
                 return Results.BadRequest(new { message = "One or more meals were not found for this coach" });
 
@@ -360,10 +366,12 @@ public static class DietPlanEndpoints
             {
                 Id = Guid.NewGuid(),
                 CoachId = coachId.Value,
+                CreatedBy = coachId.Value,
                 Name = req.Name.Trim(),
                 Description = req.Description?.Trim(),
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
+                IsPublished = req.IsPublished ?? false,
                 Days = (req.Days ?? new List<DietDayRequest>())
                     .OrderBy(d => d.DayNumber)
                     .Select(ToDietDayEntity)
@@ -402,11 +410,12 @@ public static class DietPlanEndpoints
 
             if (!string.IsNullOrWhiteSpace(req.Name)) plan.Name = req.Name.Trim();
             if (req.Description is not null) plan.Description = req.Description.Trim();
+            if (req.IsPublished.HasValue) plan.IsPublished = req.IsPublished.Value;
 
             if (req.Days is not null)
             {
                 var mealIds = req.Days.SelectMany(d => d.Meals ?? new List<DietMealRequest>()).Select(m => m.MealId).ToList();
-                var meals = await db.Meals.Where(m => m.CoachId == coachId && mealIds.Contains(m.Id)).ToListAsync();
+                var meals = await db.Meals.Where(m => mealIds.Contains(m.Id) && (m.CoachId == coachId || m.IsPublished)).ToListAsync();
                 if (mealIds.Any() && meals.Count != mealIds.Count)
                     return Results.BadRequest(new { message = "One or more meals were not found for this coach" });
 
@@ -460,7 +469,7 @@ public static class DietPlanEndpoints
             var (coachId, role) = GetUser(principal);
             if (coachId is null || role != "coach") return Results.Forbid();
 
-            var plan = await db.DietPlans.FirstOrDefaultAsync(p => p.Id == req.DietPlanId && p.CoachId == coachId);
+            var plan = await db.DietPlans.FirstOrDefaultAsync(p => p.Id == req.DietPlanId && (p.CoachId == coachId || p.IsPublished));
             if (plan is null) return Results.BadRequest(new { message = "Diet plan not found" });
 
             var mapped = await db.CoachClients.AnyAsync(cc => cc.CoachId == coachId && cc.ClientId == req.ClientId && cc.IsActive);
@@ -529,7 +538,8 @@ public static class DietPlanEndpoints
                     [
                         new DietDayRequest(1, 1800, 160, 150, 60, threeMealSchedule),
                         new DietDayRequest(2, 1900, 160, 180, 65, threeMealSchedule)
-                    ]
+                    ],
+                    true
                 )
             ),
             new DietPlanTemplateDto(
@@ -541,7 +551,8 @@ public static class DietPlanEndpoints
                     [
                         new DietDayRequest(1, 2800, 190, 320, 85, fourMealSchedule),
                         new DietDayRequest(2, 2600, 185, 260, 80, fourMealSchedule)
-                    ]
+                    ],
+                    true
                 )
             ),
             new DietPlanTemplateDto(
@@ -552,7 +563,8 @@ public static class DietPlanEndpoints
                     "Simple daily template for habit building.",
                     [
                         new DietDayRequest(1, 2200, 160, 240, 70, threeMealSchedule)
-                    ]
+                    ],
+                    true
                 )
             )
         ];
@@ -578,7 +590,7 @@ public static class DietPlanEndpoints
 
         if (role == "coach")
         {
-            query = query.Where(f => f.CoachId == userId);
+            query = query.Where(f => f.CoachId == userId || f.IsPublished);
         }
         else if (role == "client")
         {
@@ -586,10 +598,12 @@ public static class DietPlanEndpoints
                 .Where(c => c.ClientId == userId && c.IsActive)
                 .Select(c => c.DietPlanId);
 
-            query = query.Where(f => f.MealFoods.Any(mf => mf.Meal!.DietMeals.Any(dm => activePlanIds.Contains(dm.DietDay!.DietPlanId))));
+            query = query.Where(f =>
+                f.IsPublished ||
+                f.MealFoods.Any(mf => mf.Meal!.DietMeals.Any(dm => activePlanIds.Contains(dm.DietDay!.DietPlanId))));
         }
 
-        return query;
+        return query.Where(f => f.IsPublished || f.CoachId != Guid.Empty);
     }
 
     private static IQueryable<Meal> GetScopedMeals(AppDbContext db, Guid userId, string role)
@@ -600,7 +614,7 @@ public static class DietPlanEndpoints
 
         if (role == "coach")
         {
-            query = query.Where(m => m.CoachId == userId);
+            query = query.Where(m => m.CoachId == userId || m.IsPublished);
         }
         else if (role == "client")
         {
@@ -608,10 +622,10 @@ public static class DietPlanEndpoints
                 .Where(c => c.ClientId == userId && c.IsActive)
                 .Select(c => c.DietPlanId);
 
-            query = query.Where(m => m.DietMeals.Any(dm => planIds.Contains(dm.DietDay!.DietPlanId)));
+            query = query.Where(m => m.IsPublished || m.DietMeals.Any(dm => planIds.Contains(dm.DietDay!.DietPlanId)));
         }
 
-        return query;
+        return query.Where(m => m.IsPublished || m.CoachId != Guid.Empty);
     }
 
     private static IQueryable<DietPlan> GetScopedPlans(AppDbContext db, Guid userId, string role)
@@ -622,7 +636,7 @@ public static class DietPlanEndpoints
 
         if (role == "coach")
         {
-            query = query.Where(p => p.CoachId == userId);
+            query = query.Where(p => p.CoachId == userId || p.IsPublished);
         }
         else if (role == "client")
         {
@@ -633,7 +647,7 @@ public static class DietPlanEndpoints
             query = query.Where(p => planIds.Contains(p.Id));
         }
 
-        return query;
+        return query.Where(p => p.IsPublished || p.CoachId != Guid.Empty);
     }
 
     private static (Guid? userId, string role) GetUser(ClaimsPrincipal principal)
@@ -650,7 +664,7 @@ public static class DietPlanEndpoints
             .FirstAsync(m => m.Id == id);
     }
 
-    private static FoodDto ToFoodDto(Food food) => new(food.Id, food.CoachId, food.Name, food.Calories, food.Protein, food.Carbs, food.Fat, food.ServingSize, food.CreatedAt);
+    private static FoodDto ToFoodDto(Food food) => new(food.Id, food.CoachId, food.CreatedBy, food.Name, food.Calories, food.Protein, food.Carbs, food.Fat, food.ServingSize, food.IsPublished, food.CreatedAt);
 
     private static MealDto ToMealDto(Meal meal)
     {
@@ -675,6 +689,7 @@ public static class DietPlanEndpoints
         return new MealDto(
             meal.Id,
             meal.CoachId,
+            meal.CreatedBy,
             meal.Name,
             meal.Description,
             foods,
@@ -682,6 +697,7 @@ public static class DietPlanEndpoints
             (int)Math.Round(totals.protein),
             (int)Math.Round(totals.carbs),
             (int)Math.Round(totals.fat),
+            meal.IsPublished,
             meal.CreatedAt
         );
     }
@@ -689,6 +705,7 @@ public static class DietPlanEndpoints
     private static DietPlanDto ToDietPlanDto(DietPlan plan) => new(
         plan.Id,
         plan.CoachId,
+        plan.CreatedBy,
         plan.Name,
         plan.Description,
         plan.Days.OrderBy(d => d.DayNumber).Select(d => new DietDayDto(
@@ -706,6 +723,7 @@ public static class DietPlanEndpoints
             d.TargetCarbs,
             d.TargetFat
         )).ToList(),
+        plan.IsPublished,
         plan.CreatedAt,
         plan.UpdatedAt
     );
@@ -721,24 +739,24 @@ public static class DietPlanEndpoints
     );
 }
 
-public record CreateFoodRequest(string Name, int Calories, int Protein, int Carbs, int Fat, string ServingSize);
-public record UpdateFoodRequest(string? Name, int? Calories, int? Protein, int? Carbs, int? Fat, string? ServingSize);
+public record CreateFoodRequest(string Name, int Calories, int Protein, int Carbs, int Fat, string ServingSize, bool? IsPublished);
+public record UpdateFoodRequest(string? Name, int? Calories, int? Protein, int? Carbs, int? Fat, string? ServingSize, bool? IsPublished);
 
 public record MealFoodRequest(Guid FoodId, decimal Quantity);
-public record CreateMealRequest(string Name, string? Description, List<MealFoodRequest> Foods);
-public record UpdateMealRequest(string? Name, string? Description, List<MealFoodRequest>? Foods);
+public record CreateMealRequest(string Name, string? Description, List<MealFoodRequest> Foods, bool? IsPublished);
+public record UpdateMealRequest(string? Name, string? Description, List<MealFoodRequest>? Foods, bool? IsPublished);
 
 public record DietMealRequest(Guid MealId, string MealTime, int Order);
 public record DietDayRequest(int DayNumber, int TargetCalories, int TargetProtein, int TargetCarbs, int TargetFat, List<DietMealRequest> Meals);
-public record CreateDietPlanRequest(string Name, string? Description, List<DietDayRequest> Days);
-public record UpdateDietPlanRequest(string? Name, string? Description, List<DietDayRequest>? Days);
+public record CreateDietPlanRequest(string Name, string? Description, List<DietDayRequest> Days, bool? IsPublished);
+public record UpdateDietPlanRequest(string? Name, string? Description, List<DietDayRequest>? Days, bool? IsPublished);
 public record AssignDietPlanRequest(Guid ClientId, Guid DietPlanId, DateTime StartDate);
 public record DietPlanTemplateDto(string Name, string Description, CreateDietPlanRequest Payload);
 
-public record FoodDto(Guid Id, Guid CoachId, string Name, int Calories, int Protein, int Carbs, int Fat, string ServingSize, DateTime CreatedAt);
+public record FoodDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, int Calories, int Protein, int Carbs, int Fat, string ServingSize, bool IsPublished, DateTime CreatedAt);
 public record MealFoodDto(Guid Id, Guid FoodId, FoodDto? Food, decimal Quantity);
-public record MealDto(Guid Id, Guid CoachId, string Name, string? Description, List<MealFoodDto> Foods, int TotalCalories, int TotalProtein, int TotalCarbs, int TotalFat, DateTime CreatedAt);
+public record MealDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, List<MealFoodDto> Foods, int TotalCalories, int TotalProtein, int TotalCarbs, int TotalFat, bool IsPublished, DateTime CreatedAt);
 public record DietMealDto(Guid Id, Guid MealId, MealDto? Meal, string MealTime, int Order);
 public record DietDayDto(Guid Id, int DayNumber, List<DietMealDto> Meals, int TargetCalories, int TargetProtein, int TargetCarbs, int TargetFat);
-public record DietPlanDto(Guid Id, Guid CoachId, string Name, string? Description, List<DietDayDto> Days, DateTime CreatedAt, DateTime UpdatedAt);
+public record DietPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, List<DietDayDto> Days, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt);
 public record ClientDietPlanDto(Guid Id, Guid ClientId, Guid DietPlanId, DietPlanDto? DietPlan, DateTime StartDate, DateTime? EndDate, bool IsActive);

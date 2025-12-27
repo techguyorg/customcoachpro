@@ -1,0 +1,10 @@
+[
+  { "name": "Grilled Chicken Breast", "calories": 165, "protein": 31, "carbs": 0, "fat": 4, "servingSize": "100g" },
+  { "name": "Quinoa", "calories": 222, "protein": 8, "carbs": 39, "fat": 4, "servingSize": "1 cup cooked" },
+  { "name": "Greek Yogurt", "calories": 130, "protein": 23, "carbs": 9, "fat": 0, "servingSize": "1 cup" },
+  { "name": "Blueberries", "calories": 85, "protein": 1, "carbs": 21, "fat": 0, "servingSize": "1 cup" },
+  { "name": "Almond Butter", "calories": 190, "protein": 7, "carbs": 6, "fat": 18, "servingSize": "2 tbsp" },
+  { "name": "Salmon", "calories": 208, "protein": 20, "carbs": 0, "fat": 13, "servingSize": "100g" },
+  { "name": "Brown Rice", "calories": 216, "protein": 5, "carbs": 44, "fat": 2, "servingSize": "1 cup cooked" },
+  { "name": "Baby Spinach", "calories": 20, "protein": 2, "carbs": 3, "fat": 0, "servingSize": "2 cups" }
+]

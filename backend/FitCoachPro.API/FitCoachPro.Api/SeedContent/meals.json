@@ -1,0 +1,37 @@
+[
+  {
+    "name": "Greek Yogurt Parfait",
+    "description": "High-protein breakfast with fruit and healthy fats.",
+    "foods": [
+      { "food": "Greek Yogurt", "quantity": 1 },
+      { "food": "Blueberries", "quantity": 1 },
+      { "food": "Almond Butter", "quantity": 0.5 }
+    ]
+  },
+  {
+    "name": "Chicken Quinoa Bowl",
+    "description": "Lean protein with complex carbs and greens.",
+    "foods": [
+      { "food": "Grilled Chicken Breast", "quantity": 1 },
+      { "food": "Quinoa", "quantity": 1 },
+      { "food": "Baby Spinach", "quantity": 1 }
+    ]
+  },
+  {
+    "name": "Salmon and Rice Plate",
+    "description": "Omega-3 rich salmon with whole grains.",
+    "foods": [
+      { "food": "Salmon", "quantity": 1 },
+      { "food": "Brown Rice", "quantity": 1 },
+      { "food": "Baby Spinach", "quantity": 1 }
+    ]
+  },
+  {
+    "name": "Protein Snack",
+    "description": "Simple protein forward snack.",
+    "foods": [
+      { "food": "Greek Yogurt", "quantity": 0.75 },
+      { "food": "Almond Butter", "quantity": 0.25 }
+    ]
+  }
+]

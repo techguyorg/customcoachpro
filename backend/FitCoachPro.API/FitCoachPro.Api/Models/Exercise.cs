@@ -13,6 +13,9 @@ public class Exercise
     [MaxLength(1000)]
     public string? Description { get; set; }
 
+    [MaxLength(120)]
+    public string PrimaryMuscleGroup { get; set; } = string.Empty;
+
     /// <summary>
     /// Comma-separated list of muscle groups for simple filtering.
     /// </summary>
@@ -30,6 +33,9 @@ public class Exercise
 
     [MaxLength(320)]
     public string? VideoUrl { get; set; }
+
+    public Guid CreatedBy { get; set; }
+    public bool IsPublished { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

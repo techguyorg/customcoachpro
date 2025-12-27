@@ -12,7 +12,7 @@ public static class ExerciseEndpoints
     {
         var group = app.MapGroup("/api/exercises").RequireAuthorization();
 
-        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db, string? search, string? muscle, string? tag) =>
+        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db, string? search, string? muscle, string? tag, string? primaryMuscle) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
@@ -36,6 +36,11 @@ public static class ExerciseEndpoints
                 filtered = filtered.Where(e => Split(e.MuscleGroups).Any(m => m.Equals(muscle, StringComparison.OrdinalIgnoreCase)));
             }
 
+            if (!string.IsNullOrWhiteSpace(primaryMuscle))
+            {
+                filtered = filtered.Where(e => e.PrimaryMuscleGroup.Equals(primaryMuscle, StringComparison.OrdinalIgnoreCase));
+            }
+
             if (!string.IsNullOrWhiteSpace(tag))
             {
                 filtered = filtered.Where(e => Split(e.Tags).Any(t => t.Equals(tag, StringComparison.OrdinalIgnoreCase)));
@@ -43,12 +48,13 @@ public static class ExerciseEndpoints
 
             var list = filtered.ToList();
             var muscleGroups = exercises.SelectMany(e => Split(e.MuscleGroups)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(m => m);
+            var primaryMuscles = exercises.Select(e => e.PrimaryMuscleGroup).Where(m => !string.IsNullOrWhiteSpace(m)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(m => m);
             var tags = exercises.SelectMany(e => Split(e.Tags)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t);
 
             return Results.Ok(new
             {
                 data = list.Select(ToDto),
-                filters = new { muscleGroups, tags },
+                filters = new { muscleGroups, primaryMuscles, tags },
                 success = true
             });
         });
@@ -78,14 +84,17 @@ public static class ExerciseEndpoints
             {
                 Id = Guid.NewGuid(),
                 CoachId = coachId.Value,
+                CreatedBy = coachId.Value,
                 Name = req.Name.Trim(),
+                PrimaryMuscleGroup = req.PrimaryMuscleGroup?.Trim() ?? string.Empty,
                 Description = req.Description?.Trim(),
                 MuscleGroups = Join(req.MuscleGroups),
                 Tags = Join(req.Tags),
                 Equipment = req.Equipment?.Trim(),
                 VideoUrl = req.VideoUrl?.Trim(),
                 CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
+                UpdatedAt = DateTime.UtcNow,
+                IsPublished = req.IsPublished ?? false
             };
 
             db.Exercises.Add(exercise);
@@ -108,6 +117,9 @@ public static class ExerciseEndpoints
             if (req.Description is not null)
                 exercise.Description = req.Description.Trim();
 
+            if (req.PrimaryMuscleGroup is not null)
+                exercise.PrimaryMuscleGroup = req.PrimaryMuscleGroup.Trim();
+
             if (req.MuscleGroups is not null)
                 exercise.MuscleGroups = Join(req.MuscleGroups);
 
@@ -119,6 +131,9 @@ public static class ExerciseEndpoints
 
             if (req.VideoUrl is not null)
                 exercise.VideoUrl = req.VideoUrl.Trim();
+
+            if (req.IsPublished.HasValue)
+                exercise.IsPublished = req.IsPublished.Value;
 
             exercise.UpdatedAt = DateTime.UtcNow;
 
@@ -146,7 +161,7 @@ public static class ExerciseEndpoints
     {
         if (role == "coach")
         {
-            return db.Exercises.Where(e => e.CoachId == userId);
+            return db.Exercises.Where(e => e.CoachId == userId || e.IsPublished);
         }
 
         if (role == "client")
@@ -158,22 +173,24 @@ public static class ExerciseEndpoints
 
             if (coachId != Guid.Empty)
             {
-                return db.Exercises.Where(e => e.CoachId == coachId);
+                return db.Exercises.Where(e => e.CoachId == coachId || e.IsPublished);
             }
         }
 
-        return db.Exercises.Where(_ => false);
+        return db.Exercises.Where(e => e.IsPublished);
     }
 
     private static ExerciseDto ToDto(Exercise exercise) => new(
         exercise.Id,
         exercise.CoachId,
         exercise.Name,
+        exercise.PrimaryMuscleGroup,
         exercise.Description,
         Split(exercise.MuscleGroups),
         Split(exercise.Tags),
         exercise.Equipment,
         exercise.VideoUrl,
+        exercise.IsPublished,
         exercise.CreatedAt,
         exercise.UpdatedAt
     );
@@ -194,6 +211,6 @@ public static class ExerciseEndpoints
     }
 }
 
-public record ExerciseRequest(string Name, string? Description, List<string>? MuscleGroups, List<string>? Tags, string? Equipment, string? VideoUrl);
-public record UpdateExerciseRequest(string? Name, string? Description, List<string>? MuscleGroups, List<string>? Tags, string? Equipment, string? VideoUrl);
-public record ExerciseDto(Guid Id, Guid CoachId, string Name, string? Description, List<string> MuscleGroups, List<string> Tags, string? Equipment, string? VideoUrl, DateTime CreatedAt, DateTime UpdatedAt);
+public record ExerciseRequest(string Name, string? Description, string? PrimaryMuscleGroup, List<string>? MuscleGroups, List<string>? Tags, string? Equipment, string? VideoUrl, bool? IsPublished);
+public record UpdateExerciseRequest(string? Name, string? Description, string? PrimaryMuscleGroup, List<string>? MuscleGroups, List<string>? Tags, string? Equipment, string? VideoUrl, bool? IsPublished);
+public record ExerciseDto(Guid Id, Guid CoachId, string Name, string PrimaryMuscleGroup, string? Description, List<string> MuscleGroups, List<string> Tags, string? Equipment, string? VideoUrl, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt);

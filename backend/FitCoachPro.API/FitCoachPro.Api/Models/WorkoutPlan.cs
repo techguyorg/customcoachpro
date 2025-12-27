@@ -6,6 +6,8 @@ public class WorkoutPlan
 {
     public Guid Id { get; set; }
     public Guid CoachId { get; set; }
+    public Guid CreatedBy { get; set; }
+    public bool IsPublished { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public int DurationWeeks { get; set; }

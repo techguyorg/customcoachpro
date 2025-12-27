@@ -6,6 +6,8 @@ public class Food
 {
     public Guid Id { get; set; }
     public Guid CoachId { get; set; }
+    public Guid CreatedBy { get; set; }
+    public bool IsPublished { get; set; }
     [MaxLength(120)]
     public string Name { get; set; } = string.Empty;
     public int Calories { get; set; }
@@ -23,6 +25,8 @@ public class Meal
 {
     public Guid Id { get; set; }
     public Guid CoachId { get; set; }
+    public Guid CreatedBy { get; set; }
+    public bool IsPublished { get; set; }
     [MaxLength(160)]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
@@ -47,6 +51,8 @@ public class DietPlan
 {
     public Guid Id { get; set; }
     public Guid CoachId { get; set; }
+    public Guid CreatedBy { get; set; }
+    public bool IsPublished { get; set; }
     [MaxLength(160)]
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }

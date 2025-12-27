@@ -48,7 +48,7 @@ public static class WorkoutPlanEndpoints
                 .Include(p => p.Days)
                 .ThenInclude(d => d.Exercises)
                 .ThenInclude(e => e.Exercise)
-                .Where(p => p.CoachId == coachId)
+                .Where(p => p.CoachId == coachId || p.IsPublished)
                 .ToListAsync();
 
             return Results.Ok(new { data = plans.Select(ToDto), success = true });
@@ -93,11 +93,13 @@ public static class WorkoutPlanEndpoints
             {
                 Id = Guid.NewGuid(),
                 CoachId = coachId.Value,
+                CreatedBy = coachId.Value,
                 Name = req.Name.Trim(),
                 Description = req.Description?.Trim(),
                 DurationWeeks = req.DurationWeeks,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
+                IsPublished = req.IsPublished ?? false,
                 Days = (req.Days ?? new List<WorkoutDayRequest>())
                     .OrderBy(d => d.DayNumber)
                     .Select(d => ToEntity(d, exerciseLookup))
@@ -156,6 +158,10 @@ public static class WorkoutPlanEndpoints
             }
 
             plan.UpdatedAt = DateTime.UtcNow;
+            if (req.IsPublished.HasValue)
+            {
+                plan.IsPublished = req.IsPublished.Value;
+            }
             db.AuditLogs.Add(new AuditLog
             {
                 CoachId = coachId.Value,
@@ -193,7 +199,7 @@ public static class WorkoutPlanEndpoints
             var (coachId, role) = GetUser(principal);
             if (coachId is null || role != "coach") return Results.Forbid();
 
-            var plan = await db.WorkoutPlans.FirstOrDefaultAsync(p => p.Id == req.WorkoutPlanId && p.CoachId == coachId);
+            var plan = await db.WorkoutPlans.FirstOrDefaultAsync(p => p.Id == req.WorkoutPlanId && (p.CoachId == coachId || p.IsPublished));
             if (plan is null) return Results.BadRequest(new { message = "Workout plan not found" });
 
             var mapped = await db.CoachClients.AnyAsync(cc => cc.CoachId == coachId && cc.ClientId == req.ClientId && cc.IsActive);
@@ -233,11 +239,11 @@ public static class WorkoutPlanEndpoints
             var plan = await db.WorkoutPlans
                 .Include(p => p.Days)
                 .ThenInclude(d => d.Exercises)
-                .FirstOrDefaultAsync(p => p.Id == id && p.CoachId == coachId);
+                .FirstOrDefaultAsync(p => p.Id == id && (p.CoachId == coachId || p.IsPublished));
 
             if (plan is null) return Results.NotFound();
 
-            var duplicate = DuplicatePlan(plan);
+            var duplicate = DuplicatePlan(plan, coachId.Value);
 
             db.WorkoutPlans.Add(duplicate);
             await db.SaveChangesAsync();
@@ -249,9 +255,11 @@ public static class WorkoutPlanEndpoints
     private static WorkoutPlanDto ToDto(WorkoutPlan plan) => new(
         plan.Id,
         plan.CoachId,
+        plan.CreatedBy,
         plan.Name,
         plan.Description,
         plan.DurationWeeks,
+        plan.IsPublished,
         plan.CreatedAt,
         plan.UpdatedAt,
         plan.Days.OrderBy(d => d.DayNumber).Select(d => new WorkoutDayDto(
@@ -292,7 +300,7 @@ public static class WorkoutPlanEndpoints
 
         if (role == "coach")
         {
-            query = query.Where(p => p.CoachId == userId);
+            query = query.Where(p => p.CoachId == userId || p.IsPublished);
         }
         else if (role == "client")
         {
@@ -303,7 +311,7 @@ public static class WorkoutPlanEndpoints
             query = query.Where(p => planIds.Contains(p.Id));
         }
 
-        return query;
+        return query.Where(p => p.IsPublished || p.CoachId != Guid.Empty);
     }
 
     private static (Guid? userId, string role) GetUser(ClaimsPrincipal principal)
@@ -313,19 +321,21 @@ public static class WorkoutPlanEndpoints
         return (Guid.TryParse(idStr, out var uid) ? uid : null, role.ToLowerInvariant());
     }
 
-    private static WorkoutPlan DuplicatePlan(WorkoutPlan plan)
+    private static WorkoutPlan DuplicatePlan(WorkoutPlan plan, Guid coachId)
     {
         var now = DateTime.UtcNow;
 
         return new WorkoutPlan
         {
             Id = Guid.NewGuid(),
-            CoachId = plan.CoachId,
+            CoachId = coachId,
+            CreatedBy = plan.CreatedBy == Guid.Empty ? coachId : plan.CreatedBy,
             Name = $"{plan.Name} (Copy)",
             Description = plan.Description,
             DurationWeeks = plan.DurationWeeks,
             CreatedAt = now,
             UpdatedAt = now,
+            IsPublished = false,
             Days = plan.Days
                 .OrderBy(d => d.DayNumber)
                 .Select(d => new WorkoutDay
@@ -391,11 +401,13 @@ public static class WorkoutPlanEndpoints
                 exercise.Id,
                 exercise.CoachId,
                 exercise.Name,
+                exercise.PrimaryMuscleGroup,
                 exercise.Description,
                 SplitCsv(exercise.MuscleGroups),
                 SplitCsv(exercise.Tags),
                 exercise.Equipment,
                 exercise.VideoUrl,
+                exercise.IsPublished,
                 exercise.CreatedAt,
                 exercise.UpdatedAt);
 
@@ -417,7 +429,7 @@ public static class WorkoutPlanEndpoints
         }
 
         var exercises = await db.Exercises
-            .Where(e => exerciseIds.Contains(e.Id) && e.CoachId == coachId)
+            .Where(e => exerciseIds.Contains(e.Id) && (e.CoachId == coachId || e.IsPublished))
             .ToDictionaryAsync(e => e.Id);
 
         if (exercises.Count != exerciseIds.Count)
@@ -436,11 +448,11 @@ public static class WorkoutPlanEndpoints
 
 public record WorkoutExerciseRequest(Guid? ExerciseId, string? ExerciseName, int Sets, string Reps, int RestSeconds, string? Tempo, string? Notes, int Order);
 public record WorkoutDayRequest(string Name, int DayNumber, List<WorkoutExerciseRequest> Exercises);
-public record CreateWorkoutPlanRequest(string Name, string? Description, int DurationWeeks, List<WorkoutDayRequest> Days);
-public record UpdateWorkoutPlanRequest(string? Name, string? Description, int? DurationWeeks, List<WorkoutDayRequest>? Days);
+public record CreateWorkoutPlanRequest(string Name, string? Description, int DurationWeeks, List<WorkoutDayRequest> Days, bool? IsPublished);
+public record UpdateWorkoutPlanRequest(string? Name, string? Description, int? DurationWeeks, List<WorkoutDayRequest>? Days, bool? IsPublished);
 public record AssignWorkoutPlanRequest(Guid ClientId, Guid WorkoutPlanId, DateTime StartDate);
 
 public record WorkoutExerciseDto(Guid Id, Guid? ExerciseId, string? ExerciseName, int Sets, string Reps, int RestSeconds, string? Tempo, string? Notes, int Order, ExerciseDto? Exercise);
 public record WorkoutDayDto(Guid Id, string Name, int DayNumber, List<WorkoutExerciseDto> Exercises);
-public record WorkoutPlanDto(Guid Id, Guid CoachId, string Name, string? Description, int DurationWeeks, DateTime CreatedAt, DateTime UpdatedAt, List<WorkoutDayDto> Days);
+public record WorkoutPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, int DurationWeeks, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt, List<WorkoutDayDto> Days);
 public record ClientWorkoutPlanDto(Guid Id, Guid ClientId, Guid WorkoutPlanId, DateTime StartDate, DateTime? EndDate, bool IsActive);
