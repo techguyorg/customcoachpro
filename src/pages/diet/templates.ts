@@ -1,6 +1,5 @@
 import type { Meal } from "@/types";
-import type { DietPlanPayload } from "@/services/dietPlanService";
-import type { DietPlanTemplate } from "./DietPlanForm";
+import type { DietPlanPayload, DietPlanTemplate } from "@/services/dietPlanService";
 
 function buildMealSchedule(meals: Meal[], labels: string[]): { mealId: string; mealTime: string; order: number }[] {
   if (meals.length === 0) return [];
