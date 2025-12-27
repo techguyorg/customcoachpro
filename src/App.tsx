@@ -30,6 +30,8 @@ import { CreateDietPlanPage } from "@/pages/diet/CreateDietPlanPage";
 import { EditDietPlanPage } from "@/pages/diet/EditDietPlanPage";
 import { AssignDietPlanPage } from "@/pages/diet/AssignDietPlanPage";
 import { AnalyticsPage } from "@/pages/analytics/AnalyticsPage";
+import { ExerciseCatalogPage } from "@/pages/catalog/ExerciseCatalogPage";
+import { FoodCatalogPage } from "@/pages/catalog/FoodCatalogPage";
 
 // ✅ Sprint 2: Edit Client page
 import EditClientPage from "@/pages/clients/EditClientPage";
@@ -231,6 +233,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/exercise-catalog"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <ExerciseCatalogPage />
+            </RoleRoute>
+          }
+        />
+        <Route
           path="/diet-plans"
           element={
             <RoleRoute allowed={["coach"]}>
@@ -259,6 +269,14 @@ function AppRoutes() {
           element={
             <RoleRoute allowed={["coach"]}>
               <AssignDietPlanPage />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/food-catalog"
+          element={
+            <RoleRoute allowed={["coach"]}>
+              <FoodCatalogPage />
             </RoleRoute>
           }
         />

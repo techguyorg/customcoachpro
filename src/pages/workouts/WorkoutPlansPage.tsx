@@ -198,10 +198,15 @@ export function WorkoutPlansPage() {
         title="Workout Plans"
         description="Create and manage workout plans for your clients"
         actions={
-          <Button onClick={() => navigate("/workout-plans/new")} className="shadow-energy">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Plan
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/exercise-catalog")}>
+              Browse exercises
+            </Button>
+            <Button onClick={() => navigate("/workout-plans/new")} className="shadow-energy">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Plan
+            </Button>
+          </div>
         }
       />
 

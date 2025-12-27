@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, ListFilter, Plus, Search, Trash2, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import type { Exercise, WorkoutPlan } from "@/types";
 import type { WorkoutPlanPayload } from "@/services/workoutPlanService";
 import exerciseService from "@/services/exerciseService";
@@ -102,12 +110,18 @@ type ExercisePickerProps = {
   muscleGroups: string[];
   tags: string[];
   isLoading: boolean;
+  equipmentOptions: string[];
   search: string;
   onSearchChange: (value: string) => void;
   muscleFilter: string;
   onMuscleFilterChange: (value: string) => void;
   tagFilter: string;
   onTagFilterChange: (value: string) => void;
+  equipmentFilter: string;
+  onEquipmentFilterChange: (value: string) => void;
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
   onSelect: (exercise: Exercise) => void;
 };
 
@@ -118,12 +132,18 @@ function ExercisePicker({
   muscleGroups,
   tags,
   isLoading,
+  equipmentOptions,
   search,
   onSearchChange,
   muscleFilter,
   onMuscleFilterChange,
   tagFilter,
   onTagFilterChange,
+  equipmentFilter,
+  onEquipmentFilterChange,
+  page,
+  totalPages,
+  onPageChange,
   onSelect,
 }: ExercisePickerProps) {
   const handleClose = (value: boolean) => {
@@ -188,6 +208,24 @@ function ExercisePicker({
                 </select>
               </div>
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-medium text-muted-foreground">Equipment</Label>
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2">
+                <ListFilter className="h-4 w-4 text-muted-foreground" />
+                <select
+                  value={equipmentFilter}
+                  onChange={(e) => onEquipmentFilterChange(e.target.value)}
+                  className="w-full bg-transparent text-sm focus:outline-none"
+                >
+                  <option value="">All</option>
+                  {equipmentOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
           <ScrollArea className="h-[360px] pr-4">
@@ -241,6 +279,49 @@ function ExercisePicker({
               </div>
             )}
           </ScrollArea>
+
+          {totalPages > 1 && (
+            <Pagination className="justify-end">
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onPageChange(Math.max(1, page - 1));
+                    }}
+                    aria-disabled={page === 1}
+                    className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+                {Array.from({ length: totalPages }).map((_, idx) => (
+                  <PaginationItem key={idx}>
+                    <PaginationLink
+                      href="#"
+                      isActive={page === idx + 1}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        onPageChange(idx + 1);
+                      }}
+                    >
+                      {idx + 1}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onPageChange(Math.min(totalPages, page + 1));
+                    }}
+                    aria-disabled={page === totalPages}
+                    className={page === totalPages ? "pointer-events-none opacity-50" : ""}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
         </div>
       </DialogContent>
     </Dialog>
@@ -264,20 +345,33 @@ export function WorkoutPlanForm({
   const [search, setSearch] = useState("");
   const [muscleFilter, setMuscleFilter] = useState("");
   const [tagFilter, setTagFilter] = useState("");
+  const [equipmentFilter, setEquipmentFilter] = useState("");
+  const [exercisePage, setExercisePage] = useState(1);
+  const exercisePageSize = 8;
+
+  useEffect(() => {
+    setExercisePage(1);
+  }, [search, muscleFilter, tagFilter, equipmentFilter]);
 
   const exerciseQuery = useQuery({
-    queryKey: ["exercises", search, muscleFilter, tagFilter],
+    queryKey: ["exercises", search, muscleFilter, tagFilter, equipmentFilter, exercisePage],
     queryFn: () =>
       exerciseService.list({
         search: search || undefined,
         muscle: muscleFilter || undefined,
         tag: tagFilter || undefined,
+        equipment: equipmentFilter || undefined,
+        page: exercisePage,
+        pageSize: exercisePageSize,
       }),
   });
 
-  const exercises = exerciseQuery.data?.data ?? [];
+  const exercises = exerciseQuery.data?.items ?? [];
   const muscleGroups = exerciseQuery.data?.filters?.muscleGroups ?? [];
   const tags = exerciseQuery.data?.filters?.tags ?? [];
+  const equipmentOptions = exerciseQuery.data?.filters?.equipment ?? [];
+  const exerciseTotalPages = exerciseQuery.data?.totalPages ?? 1;
+  const currentExercisePage = exerciseQuery.data?.page ?? exercisePage;
 
   const totalDays = useMemo(() => days.length, [days]);
 
@@ -655,6 +749,12 @@ export function WorkoutPlanForm({
         onMuscleFilterChange={setMuscleFilter}
         tagFilter={tagFilter}
         onTagFilterChange={setTagFilter}
+        equipmentFilter={equipmentFilter}
+        onEquipmentFilterChange={setEquipmentFilter}
+        equipmentOptions={equipmentOptions}
+        page={currentExercisePage}
+        totalPages={exerciseTotalPages}
+        onPageChange={setExercisePage}
         onSelect={handleExerciseSelect}
       />
     </form>
