@@ -27,8 +27,8 @@ function PlanCard({ plan, onAssign, onDelete }: { plan: WorkoutPlan; onAssign: (
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-secondary/10 group-hover:bg-secondary/20 transition-colors">
-              <Dumbbell className="h-5 w-5 text-secondary" />
+            <div className="p-2 rounded-lg bg-icon-workout/10 group-hover:bg-icon-workout/20 transition-colors">
+              <Dumbbell className="h-5 w-5 text-icon-workout" />
             </div>
             <div>
               <CardTitle className="text-lg">{plan.name}</CardTitle>

@@ -16,12 +16,21 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import checkInService, { CheckIn } from '@/services/checkInService';
+import { iconTokens, type IconToken } from '@/config/iconTokens';
+import { cn } from '@/lib/utils';
 
 const typeIcons = {
   weight: Scale,
   photos: Camera,
   workout: Dumbbell,
   diet: Utensils,
+} as const;
+
+const typeIconTones: Record<CheckIn['type'], IconToken> = {
+  weight: 'analytics',
+  photos: 'analytics',
+  workout: 'workout',
+  diet: 'diet',
 };
 
 const typeLabels = {
@@ -63,7 +72,8 @@ export function CheckInsPage() {
 
   const CheckInCard = ({ checkIn }: { checkIn: CheckIn }) => {
     const Icon = typeIcons[checkIn.type];
-    
+    const tone = iconTokens[typeIconTones[checkIn.type]];
+
     return (
       <Card
         className="cursor-pointer hover:shadow-md transition-shadow"
@@ -72,8 +82,8 @@ export function CheckInsPage() {
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Icon className="h-5 w-5 text-primary" />
+              <div className={cn("p-2 rounded-lg", tone.background)}>
+                <Icon className={cn("h-5 w-5", tone.icon)} />
               </div>
               <div>
                 <p className="font-medium">{typeLabels[checkIn.type]}</p>
@@ -97,8 +107,8 @@ export function CheckInsPage() {
               <Badge
                 className={
                   checkIn.status === 'pending'
-                    ? 'bg-energy/20 text-energy border-0'
-                    : 'bg-vitality/20 text-vitality border-0'
+                    ? 'bg-icon-warning/15 text-icon-warning border-0'
+                    : 'bg-icon-success/15 text-icon-success border-0'
                 }
               >
                 {checkIn.status}
@@ -149,7 +159,7 @@ export function CheckInsPage() {
           <div className="space-y-4">
             <div className="p-4 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground mb-2">Status</p>
-              <Badge className={selectedCheckIn.data.completed ? 'bg-vitality/20 text-vitality' : 'bg-destructive/20 text-destructive'}>
+              <Badge className={selectedCheckIn.data.completed ? 'bg-icon-success/15 text-icon-success' : 'bg-destructive/20 text-destructive'}>
                 {selectedCheckIn.data.completed ? 'Completed' : 'Not Completed'}
               </Badge>
             </div>
@@ -180,30 +190,32 @@ export function CheckInsPage() {
           </div>
         );
       case 'photos':
-        const photos = selectedCheckIn.data.photos ?? {};
-        return (
-          <div className="grid grid-cols-3 gap-4">
-            {(['front', 'side', 'back'] as const).map((angle) => (
-              <div
-                key={angle}
-                className="aspect-[3/4] rounded-lg bg-muted flex items-center justify-center overflow-hidden"
-              >
-                {photos[angle] ? (
-                  <img
-                    src={photos[angle] ?? undefined}
-                    alt={`${angle} progress`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Camera className="h-8 w-8" />
-                    <span className="text-xs capitalize">{angle}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        );
+        {
+          const photos = selectedCheckIn.data.photos ?? {};
+          return (
+            <div className="grid grid-cols-3 gap-4">
+              {(['front', 'side', 'back'] as const).map((angle) => (
+                <div
+                  key={angle}
+                  className="aspect-[3/4] rounded-lg bg-muted flex items-center justify-center overflow-hidden"
+                >
+                  {photos[angle] ? (
+                    <img
+                      src={photos[angle] ?? undefined}
+                      alt={`${angle} progress`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Camera className="h-8 w-8 text-icon-analytics" />
+                      <span className="text-xs capitalize">{angle}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        }
       default:
         return null;
     }
@@ -216,7 +228,7 @@ export function CheckInsPage() {
         description="Review and manage client check-ins"
         actions={
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-energy border-energy">
+            <Badge variant="outline" className="text-icon-warning border-icon-warning">
               {pendingCheckIns.length} pending
             </Badge>
           </div>
@@ -237,11 +249,11 @@ export function CheckInsPage() {
       <Tabs defaultValue="pending" className="space-y-4">
         <TabsList>
           <TabsTrigger value="pending" className="flex items-center gap-2">
-            <ClipboardCheck className="h-4 w-4" />
+            <ClipboardCheck className="h-4 w-4 text-icon-warning" />
             Pending ({pendingCheckIns.length})
           </TabsTrigger>
           <TabsTrigger value="reviewed" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
+            <Eye className="h-4 w-4 text-icon-success" />
             Reviewed ({reviewedCheckIns.length})
           </TabsTrigger>
         </TabsList>
@@ -324,7 +336,8 @@ export function CheckInsPage() {
                 <DialogTitle className="flex items-center gap-2">
                   {(() => {
                     const Icon = typeIcons[selectedCheckIn.type];
-                    return <Icon className="h-5 w-5 text-primary" />;
+                    const tone = iconTokens[typeIconTones[selectedCheckIn.type]];
+                    return <Icon className={cn("h-5 w-5", tone.icon)} />;
                   })()}
                   {typeLabels[selectedCheckIn.type]}
                 </DialogTitle>

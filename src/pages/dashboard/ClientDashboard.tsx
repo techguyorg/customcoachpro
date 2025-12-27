@@ -70,6 +70,7 @@ export function ClientDashboard() {
           value={`${stats?.currentWeight ?? 0} lbs`}
           icon={Scale}
           variant="primary"
+          iconTone="brand"
           trend={{ value: weightChangeAbs, isPositive: weightChangePositive }}
         />
         <StatCard
@@ -78,6 +79,7 @@ export function ClientDashboard() {
           subtitle="This month"
           icon={Dumbbell}
           variant="secondary"
+          iconTone="workout"
         />
         <StatCard
           title="Diet Compliance"
@@ -85,12 +87,14 @@ export function ClientDashboard() {
           subtitle="Average"
           icon={Utensils}
           variant="accent"
+          iconTone="diet"
         />
         <StatCard
           title="Days on Plan"
           value={stats?.daysOnPlan ?? 0}
           subtitle="Keep it up!"
           icon={Calendar}
+          iconTone="success"
         />
       </div>
 
@@ -99,7 +103,7 @@ export function ClientDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Dumbbell className="h-5 w-5 text-secondary" />
+                <Dumbbell className="h-5 w-5 text-icon-workout" />
                 Today's Workout
               </CardTitle>
               <CardDescription>{mockTodayWorkout.name}</CardDescription>
@@ -126,7 +130,7 @@ export function ClientDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
-                <Utensils className="h-5 w-5 text-accent" />
+                <Utensils className="h-5 w-5 text-icon-diet" />
                 Today's Meals
               </CardTitle>
               <CardDescription>Target: coming in Sprint 3</CardDescription>
@@ -141,7 +145,7 @@ export function ClientDashboard() {
                 <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                   <div className="flex items-center gap-3">
                     {meal.status === "completed" ? (
-                      <CheckCircle2 className="h-5 w-5 text-vitality" />
+                      <CheckCircle2 className="h-5 w-5 text-icon-success" />
                     ) : (
                       <div className="h-5 w-5 rounded-full border-2 border-muted-foreground" />
                     )}
@@ -161,7 +165,7 @@ export function ClientDashboard() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-primary" />
+            <TrendingUp className="h-5 w-5 text-icon-analytics" />
             This Week's Progress
           </CardTitle>
           <CardDescription>Streak system comes later</CardDescription>
@@ -172,7 +176,7 @@ export function ClientDashboard() {
               <div key={index} className="flex flex-col items-center gap-2">
                 <div
                   className={`h-12 w-12 rounded-xl flex items-center justify-center ${
-                    day.completed ? "bg-vitality text-vitality-foreground" : "bg-muted text-muted-foreground"
+                    day.completed ? "bg-icon-success/15 text-icon-success" : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {day.completed ? <CheckCircle2 className="h-6 w-6" /> : <span className="text-sm font-medium">{day.day}</span>}

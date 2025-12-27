@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
@@ -47,6 +48,15 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        icon: {
+          neutral: "hsl(var(--icon-neutral))",
+          brand: "hsl(var(--icon-brand))",
+          warning: "hsl(var(--icon-warning))",
+          workout: "hsl(var(--icon-workout))",
+          diet: "hsl(var(--icon-diet))",
+          analytics: "hsl(var(--icon-analytics))",
+          success: "hsl(var(--icon-success))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -87,5 +97,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;

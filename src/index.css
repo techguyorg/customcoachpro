@@ -53,6 +53,14 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --icon-neutral: 215 16% 47%;
+    --icon-brand: 221 83% 53%;
+    --icon-warning: 32 94% 50%;
+    --icon-workout: 259 79% 65%;
+    --icon-diet: 17 88% 60%;
+    --icon-analytics: 192 82% 45%;
+    --icon-success: 142 70% 45%;
   }
 
   .dark {
@@ -91,6 +99,14 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    --icon-neutral: 215 16% 72%;
+    --icon-brand: 221 83% 72%;
+    --icon-warning: 35 90% 64%;
+    --icon-workout: 259 79% 75%;
+    --icon-diet: 17 88% 68%;
+    --icon-analytics: 192 82% 70%;
+    --icon-success: 142 70% 70%;
   }
 }
 

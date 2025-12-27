@@ -29,6 +29,7 @@ export function AnalyticsPage() {
           subtitle={`${mockStats.activeClients} currently active`}
           icon={Users}
           variant="primary"
+          iconTone="brand"
           trend={{ value: 12, isPositive: true }}
         />
         <StatCard
@@ -37,6 +38,7 @@ export function AnalyticsPage() {
           subtitle="Across all clients"
           icon={ClipboardCheck}
           variant="secondary"
+          iconTone="warning"
           trend={{ value: 8, isPositive: true }}
         />
         <StatCard
@@ -45,6 +47,7 @@ export function AnalyticsPage() {
           subtitle="Diet & workout combined"
           icon={TrendingUp}
           variant="accent"
+          iconTone="analytics"
           trend={{ value: 3, isPositive: true }}
         />
       </div>
@@ -82,7 +85,7 @@ export function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Dumbbell className="h-5 w-5 text-secondary" />
+              <Dumbbell className="h-5 w-5 text-icon-workout" />
               Workout Plans
             </CardTitle>
           </CardHeader>
@@ -98,7 +101,7 @@ export function AnalyticsPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Avg. Completion Rate</span>
-                <span className="font-bold text-vitality">92%</span>
+                <span className="font-bold text-icon-success">92%</span>
               </div>
             </div>
           </CardContent>
@@ -107,7 +110,7 @@ export function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Utensils className="h-5 w-5 text-accent" />
+              <Utensils className="h-5 w-5 text-icon-diet" />
               Diet Plans
             </CardTitle>
           </CardHeader>
@@ -123,7 +126,7 @@ export function AnalyticsPage() {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Avg. Compliance Rate</span>
-                <span className="font-bold text-vitality">85%</span>
+                <span className="font-bold text-icon-success">85%</span>
               </div>
             </div>
           </CardContent>
