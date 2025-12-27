@@ -35,6 +35,17 @@ export type CheckIn = {
   data: CheckInData;
 };
 
+export type CheckInQueryParams = {
+  type?: CheckInType;
+  status?: CheckInStatus;
+  clientId?: string;
+  search?: string;
+  from?: string;
+  to?: string;
+  sortBy?: "submittedAt" | "clientName" | "type" | "status";
+  sortDirection?: "asc" | "desc";
+};
+
 export type CreateCheckInPayload = {
   clientId: string;
   type: CheckInType;
@@ -128,6 +139,26 @@ const toDomain = (api: CheckInApi): CheckIn => {
 };
 
 const checkInService = {
+  buildQueryString(params?: CheckInQueryParams) {
+    if (!params) return "";
+
+    const query = new URLSearchParams();
+
+    if (params.type) query.set("type", params.type);
+    if (params.status) query.set("status", params.status);
+    if (params.clientId) query.set("clientId", params.clientId);
+    if (params.search) query.set("search", params.search);
+    if (params.from) query.set("from", params.from);
+    if (params.to) query.set("to", params.to);
+    if (params.sortBy) query.set("sortBy", params.sortBy);
+    if (params.sortDirection) query.set("sortDirection", params.sortDirection);
+
+    const queryString = query.toString();
+    return queryString ? `?${queryString}` : "";
+  },
+
+  async getCheckIns(params?: CheckInQueryParams): Promise<CheckIn[]> {
+    const endpoint = `${API_ENDPOINTS.checkIns.base}${this.buildQueryString(params)}`;
   async getCheckIns(filters?: CheckInFilters): Promise<CheckIn[]> {
     const params = new URLSearchParams();
 
@@ -165,6 +196,17 @@ const checkInService = {
   async markReviewed(id: string): Promise<CheckIn> {
     const response = await apiService.put<CheckInApi>(API_ENDPOINTS.checkIns.review(id));
     return toDomain(response);
+  },
+
+  async markReviewedBulk(ids: string[]): Promise<CheckIn[]> {
+    const endpoint = `${API_ENDPOINTS.checkIns.base}/bulk/review`;
+    const response = await apiService.put<CheckInApi[]>(endpoint, { ids });
+    return response.map(toDomain);
+  },
+
+  async requestUpdate(ids: string[], message?: string): Promise<void> {
+    const endpoint = `${API_ENDPOINTS.checkIns.base}/actions/request-update`;
+    await apiService.post(endpoint, { ids, message });
   },
 };
 
