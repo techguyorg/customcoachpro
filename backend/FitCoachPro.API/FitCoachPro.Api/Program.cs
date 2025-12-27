@@ -49,7 +49,8 @@ builder.Services.AddSingleton<IEmailNotificationSender, AzureEmailNotificationSe
 builder.Services.AddHostedService<NotificationWorker>();
 
 // ✅ DB selection: SQL if available, else InMemory
-var sqlConn = builder.Configuration.GetConnectionString("SqlConnection");
+var sqlConn = builder.Configuration.GetConnectionString("SqlConnection")
+             ?? builder.Configuration.GetConnectionString("DefaultConnection");
 if (!string.IsNullOrWhiteSpace(sqlConn))
 {
     builder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlServer(sqlConn));
