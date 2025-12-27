@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backend build outputs
+backend/**/bin
+backend/**/obj
+
+# Env and local config
+.env
+.env.*
+
+# Frontend artifacts
+.vite
