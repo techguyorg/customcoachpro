@@ -574,11 +574,12 @@ public static class DietPlanEndpoints
 
     private static IQueryable<Food> GetScopedFoods(AppDbContext db, Guid userId, string role)
     {
-        var query = db.Foods.AsQueryable();
+        var systemOwner = Guid.Empty;
+        var query = db.Foods.Where(f => f.CoachId == systemOwner).AsQueryable();
 
         if (role == "coach")
         {
-            query = query.Where(f => f.CoachId == userId);
+            query = query.Concat(db.Foods.Where(f => f.CoachId == userId));
         }
         else if (role == "client")
         {
@@ -586,21 +587,27 @@ public static class DietPlanEndpoints
                 .Where(c => c.ClientId == userId && c.IsActive)
                 .Select(c => c.DietPlanId);
 
-            query = query.Where(f => f.MealFoods.Any(mf => mf.Meal!.DietMeals.Any(dm => activePlanIds.Contains(dm.DietDay!.DietPlanId))));
+            query = query.Concat(db.Foods.Where(f =>
+                f.MealFoods.Any(mf => mf.Meal!.DietMeals.Any(dm => activePlanIds.Contains(dm.DietDay!.DietPlanId)))));
         }
 
-        return query;
+        return query.Distinct();
     }
 
     private static IQueryable<Meal> GetScopedMeals(AppDbContext db, Guid userId, string role)
     {
+        var systemOwner = Guid.Empty;
+
         var query = db.Meals
             .Include(m => m.Foods)!.ThenInclude(f => f.Food)
-            .AsQueryable();
+            .Where(m => m.CoachId == systemOwner);
 
         if (role == "coach")
         {
-            query = query.Where(m => m.CoachId == userId);
+            query = query.Concat(
+                db.Meals
+                    .Include(m => m.Foods)!.ThenInclude(f => f.Food)
+                    .Where(m => m.CoachId == userId));
         }
         else if (role == "client")
         {
@@ -608,21 +615,29 @@ public static class DietPlanEndpoints
                 .Where(c => c.ClientId == userId && c.IsActive)
                 .Select(c => c.DietPlanId);
 
-            query = query.Where(m => m.DietMeals.Any(dm => planIds.Contains(dm.DietDay!.DietPlanId)));
+            query = query.Concat(
+                db.Meals
+                    .Include(m => m.Foods)!.ThenInclude(f => f.Food)
+                    .Where(m => m.DietMeals.Any(dm => planIds.Contains(dm.DietDay!.DietPlanId))));
         }
 
-        return query;
+        return query.Distinct();
     }
 
     private static IQueryable<DietPlan> GetScopedPlans(AppDbContext db, Guid userId, string role)
     {
+        var systemOwner = Guid.Empty;
+
         var query = db.DietPlans
             .Include(p => p.Days)!.ThenInclude(d => d.Meals)!.ThenInclude(m => m.Meal)!.ThenInclude(m => m!.Foods)!.ThenInclude(f => f.Food)
-            .AsQueryable();
+            .Where(p => p.CoachId == systemOwner);
 
         if (role == "coach")
         {
-            query = query.Where(p => p.CoachId == userId);
+            query = query.Concat(
+                db.DietPlans
+                    .Include(p => p.Days)!.ThenInclude(d => d.Meals)!.ThenInclude(m => m.Meal)!.ThenInclude(m => m!.Foods)!.ThenInclude(f => f.Food)
+                    .Where(p => p.CoachId == userId));
         }
         else if (role == "client")
         {
@@ -630,10 +645,13 @@ public static class DietPlanEndpoints
                 .Where(c => c.ClientId == userId && c.IsActive)
                 .Select(c => c.DietPlanId);
 
-            query = query.Where(p => planIds.Contains(p.Id));
+            query = query.Concat(
+                db.DietPlans
+                    .Include(p => p.Days)!.ThenInclude(d => d.Meals)!.ThenInclude(m => m.Meal)!.ThenInclude(m => m!.Foods)!.ThenInclude(f => f.Food)
+                    .Where(p => planIds.Contains(p.Id)));
         }
 
-        return query;
+        return query.Distinct();
     }
 
     private static (Guid? userId, string role) GetUser(ClaimsPrincipal principal)
