@@ -8,11 +8,13 @@ import WorkoutPlanForm from "./WorkoutPlanForm";
 import workoutPlanService, { type WorkoutPlanPayload } from "@/services/workoutPlanService";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Sparkles } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function CreateWorkoutPlanPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const createMutation = useMutation({
     mutationFn: (payload: WorkoutPlanPayload) => workoutPlanService.create(payload),
@@ -34,6 +36,9 @@ export function CreateWorkoutPlanPage() {
     queryKey: ["workout-plans"],
     queryFn: () => workoutPlanService.list(),
   });
+
+  const systemTemplates = templates.filter((template) => template.coachId && template.coachId !== user?.id);
+  const myTemplates = templates.filter((template) => !template.coachId || template.coachId === user?.id);
 
   const duplicateMutation = useMutation({
     mutationFn: (planId: string) => workoutPlanService.duplicate(planId),
@@ -68,48 +73,104 @@ export function CreateWorkoutPlanPage() {
             <Sparkles className="h-5 w-5 text-secondary" />
             <div>
               <CardTitle>Template gallery</CardTitle>
-              <CardDescription>Start from an existing plan and duplicate it instantly.</CardDescription>
+              <CardDescription>System templates are read-only. Clone them to add editable copies to your library.</CardDescription>
             </div>
           </div>
           <Badge variant="outline">{templates.length} available</Badge>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-6">
           {loadingTemplates ? (
             <div className="text-sm text-muted-foreground">Loading templates...</div>
           ) : templates.length === 0 ? (
             <div className="text-sm text-muted-foreground">No templates yet. Create your first plan below.</div>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {templates.map((template) => (
-                <div key={template.id} className="border rounded-lg p-4 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-semibold leading-tight">{template.name}</h3>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {template.description || "No description provided."}
-                      </p>
-                    </div>
-                    <Badge variant="secondary">{template.durationWeeks} weeks</Badge>
+            <>
+              {systemTemplates.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-semibold">System templates</div>
+                    <Badge variant="outline">Read-only</Badge>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                    <span>{template.days.length} days</span>
-                    <span>•</span>
-                    <span>Updated {new Date(template.updatedAt).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex justify-end">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => duplicateMutation.mutate(template.id)}
-                      disabled={duplicateMutation.isPending}
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      Use template
-                    </Button>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {systemTemplates.map((template) => (
+                      <div key={template.id} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-semibold leading-tight">{template.name}</h3>
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {template.description || "No description provided."}
+                            </p>
+                          </div>
+                          <Badge variant="secondary">{template.durationWeeks} weeks</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                          <span>{template.days.length} days</span>
+                          <span>•</span>
+                          <span>Updated {new Date(template.updatedAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => duplicateMutation.mutate(template.id)}
+                            disabled={duplicateMutation.isPending}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Clone to my library
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">My library</div>
+                  <Badge variant="outline">{myTemplates.length} editable</Badge>
+                </div>
+
+                {myTemplates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Clone a system template to start building your library.</p>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {myTemplates.map((template) => (
+                      <div key={template.id} className="border rounded-lg p-4 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="font-semibold leading-tight">{template.name}</h3>
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {template.description || "No description provided."}
+                            </p>
+                          </div>
+                          <Badge variant="secondary">{template.durationWeeks} weeks</Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                          <span>{template.days.length} days</span>
+                          <span>•</span>
+                          <span>Updated {new Date(template.updatedAt).toLocaleDateString()}</span>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button size="sm" variant="ghost" onClick={() => navigate(`/workout-plans/${template.id}/edit`)}>
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => duplicateMutation.mutate(template.id)}
+                            disabled={duplicateMutation.isPending}
+                          >
+                            <Copy className="h-4 w-4 mr-2" />
+                            Use template
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

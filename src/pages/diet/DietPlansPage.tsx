@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Utensils, MoreHorizontal, Trash2, Users, ChefHat, Soup, Leaf } from "lucide-react";
+import { Plus, Utensils, MoreHorizontal, Trash2, Users, ChefHat, Soup, Leaf, Copy, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,11 +18,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useToast } from "@/hooks/use-toast";
-import type { DietPlan, Meal } from "@/types";
+import type { DietPlan, Food, Meal } from "@/types";
 import foodService, { type FoodPayload } from "@/services/foodService";
 import mealService, { type MealPayload } from "@/services/mealService";
 import dietPlanService, { type DietPlanPayload } from "@/services/dietPlanService";
 import { buildDietTemplates } from "./templates";
+import { FoodPicker } from "@/components/diet/FoodPicker";
 
 const foodMacroLabels: { key: keyof Pick<FoodPayload, "calories" | "protein" | "carbs" | "fat">; label: string }[] = [
   { key: "calories", label: "calories" },
@@ -128,11 +129,15 @@ export function DietPlansPage() {
     description: "",
     foods: [{ foodId: "", quantity: 1 }],
   });
+  const [foodPickerOpen, setFoodPickerOpen] = useState(false);
+  const [foodPickerIndex, setFoodPickerIndex] = useState<number | null>(null);
 
-  const { data: foods = [], isLoading: foodsLoading } = useQuery({
+  const { data: foodsResult, isLoading: foodsLoading } = useQuery({
     queryKey: ["foods"],
     queryFn: () => foodService.list(),
   });
+
+  const foods = useMemo(() => foodsResult?.items ?? [], [foodsResult]);
 
   const { data: meals = [], isLoading: mealsLoading } = useQuery({
     queryKey: ["meals"],
@@ -166,6 +171,23 @@ export function DietPlansPage() {
     });
   }, [foods]);
 
+  const openFoodPicker = (idx: number) => {
+    setFoodPickerIndex(idx);
+    setFoodPickerOpen(true);
+  };
+
+  const handleFoodPick = (food: Food) => {
+    if (foodPickerIndex === null) return;
+    updateMealFood(foodPickerIndex, { foodId: food.id });
+    setFoodPickerIndex(null);
+    setFoodPickerOpen(false);
+  };
+
+  const closeFoodPicker = () => {
+    setFoodPickerOpen(false);
+    setFoodPickerIndex(null);
+  };
+
   const createFoodMutation = useMutation({
     mutationFn: (payload: FoodPayload) => foodService.create(payload),
     onSuccess: () => {
@@ -198,15 +220,15 @@ export function DietPlansPage() {
     },
   });
 
-  const createPlanMutation = useMutation({
+  const cloneTemplateMutation = useMutation({
     mutationFn: (payload: DietPlanPayload) => dietPlanService.create(payload),
     onSuccess: () => {
-      toast({ title: "Diet plan created" });
+      toast({ title: "Template cloned", description: "You can customize the copy in your library." });
       queryClient.invalidateQueries({ queryKey: ["diet-plans"] });
     },
     onError: (error) => {
       toast({
-        title: "Unable to create plan",
+        title: "Unable to clone template",
         description: error instanceof Error ? error.message : "Please try again.",
         variant: "destructive",
       });
@@ -273,7 +295,7 @@ export function DietPlansPage() {
   };
 
   const handleUseTemplate = (payload: DietPlanPayload) => {
-    createPlanMutation.mutate(payload);
+    cloneTemplateMutation.mutate(payload);
   };
 
   return (
@@ -283,6 +305,10 @@ export function DietPlansPage() {
         description="Create and manage diet plans, meals, and foods"
         actions={
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => navigate("/food-catalog")}>
+              <Leaf className="h-4 w-4 mr-2" />
+              Food catalog
+            </Button>
             <Button variant="outline" onClick={() => navigate("/diet-plans/new")}>
               <Soup className="h-4 w-4 mr-2" />
               Build custom
@@ -309,36 +335,40 @@ export function DietPlansPage() {
                 <CardTitle className="flex items-center gap-2">
                   <ChefHat className="h-4 w-4" /> Templates
                 </CardTitle>
-                <CardDescription>Start quickly and tweak after creation.</CardDescription>
+                <CardDescription>System templates are read-only. Clone them to customize for your clients.</CardDescription>
               </div>
               <Button variant="outline" size="sm" onClick={() => navigate("/diet-plans/new")}>Custom build</Button>
             </CardHeader>
             <CardContent className="grid gap-3 lg:grid-cols-3 md:grid-cols-2">
               {templates.map((template) => (
                 <div key={template.name} className="border rounded-lg p-3 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Leaf className="h-4 w-4 text-icon-diet" />
-                    <div className="font-medium">{template.name}</div>
-                  </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2">{template.description}</p>
-                  <div className="flex gap-2">
-                    {template.payload.days.map((day) => (
-                      <Badge key={day.dayNumber} variant="outline">
-                        Day {day.dayNumber}
-                      </Badge>
-                    ))}
-                  </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => handleUseTemplate(template.payload)}
-                    disabled={createPlanMutation.isPending}
-                  >
-                    {createPlanMutation.isPending ? "Creating..." : "Use template"}
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <Leaf className="h-4 w-4 text-icon-diet" />
+                  <div className="font-medium">{template.name}</div>
+                  <Badge variant="outline" className="ml-auto">
+                    System template
+                  </Badge>
                 </div>
-              ))}
+                <p className="text-sm text-muted-foreground line-clamp-2">{template.description}</p>
+                <div className="flex gap-2">
+                  {template.payload.days.map((day) => (
+                    <Badge key={day.dayNumber} variant="outline">
+                      Day {day.dayNumber}
+                    </Badge>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => handleUseTemplate(template.payload)}
+                  disabled={cloneTemplateMutation.isPending}
+                >
+                  {cloneTemplateMutation.isPending ? "Cloning..." : "Clone to my library"}
+                  <Copy className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            ))}
             </CardContent>
           </Card>
 
@@ -401,7 +431,7 @@ export function DietPlansPage() {
                       </Button>
                     </div>
                     {mealForm.foods.map((item, idx) => (
-                      <div key={`${item.foodId}-${idx}`} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                      <div key={`${item.foodId}-${idx}`} className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
                         <div className="space-y-1.5 md:col-span-2">
                           <Label>Food</Label>
                           <select
@@ -428,6 +458,13 @@ export function DietPlansPage() {
                             value={item.quantity}
                             onChange={(e) => updateMealFood(idx, { quantity: Number(e.target.value) })}
                           />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="invisible md:visible">Browse</Label>
+                          <Button type="button" variant="outline" size="sm" onClick={() => openFoodPicker(idx)}>
+                            <Search className="h-4 w-4 mr-2" />
+                            Food picker
+                          </Button>
                         </div>
                         <div className="flex justify-end">
                           <Button type="button" variant="ghost" size="icon" onClick={() => removeMealFood(idx)} disabled={mealForm.foods.length === 1}>
@@ -563,6 +600,8 @@ export function DietPlansPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <FoodPicker open={foodPickerOpen} onClose={closeFoodPicker} onSelect={handleFoodPick} />
     </div>
   );
 }

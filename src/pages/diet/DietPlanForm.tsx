@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { DietPlan, Meal } from "@/types";
 import type { DietPlanPayload, DietPlanTemplate } from "@/services/dietPlanService";
 
@@ -249,15 +250,18 @@ export function DietPlanForm({
               <ChefHat className="h-4 w-4" />
               Quick-start templates
             </CardTitle>
-            <CardDescription>Apply a structure you can tweak before saving.</CardDescription>
+            <CardDescription>System templates are read-only. Apply one, tweak it, then save to your library.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-3">
             {templates.map((template) => (
               <div key={template.name} className="border rounded-lg p-3 space-y-2">
-                <div className="font-medium">{template.name}</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-medium">{template.name}</div>
+                  <Badge variant="outline">System</Badge>
+                </div>
                 <p className="text-sm text-muted-foreground line-clamp-2">{template.description}</p>
                 <Button type="button" variant="outline" size="sm" onClick={() => applyTemplate(template)}>
-                  Use template
+                  Apply to form
                 </Button>
               </div>
             ))}
