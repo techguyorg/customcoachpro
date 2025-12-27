@@ -63,6 +63,7 @@ export const API_ENDPOINTS = {
     byId: (id: string) => `/workout-plans/${id}`,
     byCoach: (coachId: string) => `/workout-plans/coach/${coachId}`,
     assign: "/workout-plans/assign",
+    duplicate: (id: string) => `/workout-plans/${id}/duplicate`,
     clientPlans: (clientId: string) => `/workout-plans/client/${clientId}`,
   },
 
