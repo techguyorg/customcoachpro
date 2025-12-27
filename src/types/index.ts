@@ -86,10 +86,12 @@ export interface Exercise {
   coachId: string;
   name: string;
   description?: string;
-  muscleGroup: string;
-  equipmentRequired?: string;
+  muscleGroups: string[];
+  tags: string[];
+  equipment?: string;
   videoUrl?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface WorkoutExercise {
@@ -202,6 +204,17 @@ export interface ClientDietPlan {
   startDate: string;
   endDate?: string;
   isActive: boolean;
+}
+
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  createdAt: string;
+  readAt?: string | null;
+  isRead: boolean;
+  actionUrl?: string | null;
 }
 
 // Dashboard Stats

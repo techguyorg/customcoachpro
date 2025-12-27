@@ -47,6 +47,7 @@ public static class WorkoutPlanEndpoints
             var plans = await db.WorkoutPlans
                 .Include(p => p.Days)
                 .ThenInclude(d => d.Exercises)
+                .ThenInclude(e => e.Exercise)
                 .Where(p => p.CoachId == coachId)
                 .ToListAsync();
 
@@ -67,7 +68,7 @@ public static class WorkoutPlanEndpoints
             }
 
             var assignments = await db.ClientWorkoutPlans
-                .Include(c => c.WorkoutPlan)!.ThenInclude(p => p!.Days)!.ThenInclude(d => d.Exercises)
+                .Include(c => c.WorkoutPlan)!.ThenInclude(p => p!.Days)!.ThenInclude(d => d.Exercises)!.ThenInclude(e => e.Exercise)
                 .Where(c => c.ClientId == clientId && c.IsActive)
                 .ToListAsync();
 
@@ -85,6 +86,9 @@ public static class WorkoutPlanEndpoints
             if (req.DurationWeeks <= 0)
                 return Results.BadRequest(new { message = "Duration must be at least 1 week" });
 
+            var (exerciseLookup, validationError) = await ValidateExercises(db, coachId.Value, req.Days ?? new List<WorkoutDayRequest>());
+            if (validationError is not null) return validationError;
+
             var plan = new WorkoutPlan
             {
                 Id = Guid.NewGuid(),
@@ -96,7 +100,7 @@ public static class WorkoutPlanEndpoints
                 UpdatedAt = DateTime.UtcNow,
                 Days = (req.Days ?? new List<WorkoutDayRequest>())
                     .OrderBy(d => d.DayNumber)
-                    .Select(ToEntity)
+                    .Select(d => ToEntity(d, exerciseLookup))
                     .ToList()
             };
 
@@ -139,12 +143,15 @@ public static class WorkoutPlanEndpoints
 
             if (req.Days is not null)
             {
+                var (exerciseLookup, validationError) = await ValidateExercises(db, coachId.Value, req.Days);
+                if (validationError is not null) return validationError;
+
                 db.WorkoutExercises.RemoveRange(plan.Days.SelectMany(d => d.Exercises));
                 db.WorkoutDays.RemoveRange(plan.Days);
 
                 plan.Days = req.Days
                     .OrderBy(d => d.DayNumber)
-                    .Select(ToEntity)
+                    .Select(d => ToEntity(d, exerciseLookup))
                     .ToList();
             }
 
@@ -217,6 +224,26 @@ public static class WorkoutPlanEndpoints
 
             return Results.Ok(new { data = ToAssignmentDto(existing), success = true });
         });
+
+        group.MapPost("/{id:guid}/duplicate", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
+        {
+            var (coachId, role) = GetUser(principal);
+            if (coachId is null || role != "coach") return Results.Forbid();
+
+            var plan = await db.WorkoutPlans
+                .Include(p => p.Days)
+                .ThenInclude(d => d.Exercises)
+                .FirstOrDefaultAsync(p => p.Id == id && p.CoachId == coachId);
+
+            if (plan is null) return Results.NotFound();
+
+            var duplicate = DuplicatePlan(plan);
+
+            db.WorkoutPlans.Add(duplicate);
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new { data = ToDto(duplicate), success = true });
+        });
     }
 
     private static WorkoutPlanDto ToDto(WorkoutPlan plan) => new(
@@ -234,13 +261,14 @@ public static class WorkoutPlanEndpoints
             d.Exercises.OrderBy(e => e.Order).Select(e => new WorkoutExerciseDto(
                 e.Id,
                 e.ExerciseId,
-                e.ExerciseName,
+                e.ExerciseName ?? e.Exercise?.Name,
                 e.Sets,
                 e.Reps,
                 e.RestSeconds,
                 e.Tempo,
                 e.Notes,
-                e.Order
+                e.Order,
+                ToExerciseDto(e.Exercise)
             )).ToList()
         )).ToList()
     );
@@ -254,33 +282,12 @@ public static class WorkoutPlanEndpoints
         assignment.IsActive
     );
 
-    private static WorkoutDay ToEntity(WorkoutDayRequest req) => new()
-    {
-        Id = Guid.NewGuid(),
-        Name = string.IsNullOrWhiteSpace(req.Name) ? $"Day {req.DayNumber}" : req.Name.Trim(),
-        DayNumber = req.DayNumber,
-        Exercises = (req.Exercises ?? new List<WorkoutExerciseRequest>())
-            .OrderBy(e => e.Order)
-            .Select(e => new WorkoutExercise
-            {
-                Id = Guid.NewGuid(),
-                ExerciseId = e.ExerciseId,
-                ExerciseName = e.ExerciseName?.Trim(),
-                Sets = e.Sets,
-                Reps = e.Reps,
-                RestSeconds = e.RestSeconds,
-                Tempo = e.Tempo,
-                Notes = e.Notes,
-                Order = e.Order
-            })
-            .ToList()
-    };
-
     private static IQueryable<WorkoutPlan> GetScopedPlans(AppDbContext db, Guid userId, string role)
     {
         var query = db.WorkoutPlans
             .Include(p => p.Days)
             .ThenInclude(d => d.Exercises)
+            .ThenInclude(e => e.Exercise)
             .AsQueryable();
 
         if (role == "coach")
@@ -305,6 +312,126 @@ public static class WorkoutPlanEndpoints
         var role = principal.FindFirstValue(ClaimTypes.Role) ?? principal.FindFirstValue("role") ?? string.Empty;
         return (Guid.TryParse(idStr, out var uid) ? uid : null, role.ToLowerInvariant());
     }
+
+    private static WorkoutPlan DuplicatePlan(WorkoutPlan plan)
+    {
+        var now = DateTime.UtcNow;
+
+        return new WorkoutPlan
+        {
+            Id = Guid.NewGuid(),
+            CoachId = plan.CoachId,
+            Name = $"{plan.Name} (Copy)",
+            Description = plan.Description,
+            DurationWeeks = plan.DurationWeeks,
+            CreatedAt = now,
+            UpdatedAt = now,
+            Days = plan.Days
+                .OrderBy(d => d.DayNumber)
+                .Select(d => new WorkoutDay
+                {
+                    Id = Guid.NewGuid(),
+                    Name = d.Name,
+                    DayNumber = d.DayNumber,
+                    Exercises = d.Exercises
+                        .OrderBy(e => e.Order)
+                        .Select(e => new WorkoutExercise
+                        {
+                            Id = Guid.NewGuid(),
+                            ExerciseId = e.ExerciseId,
+                            ExerciseName = e.ExerciseName,
+                            Sets = e.Sets,
+                            Reps = e.Reps,
+                            RestSeconds = e.RestSeconds,
+                            Tempo = e.Tempo,
+                            Notes = e.Notes,
+                            Order = e.Order
+                        })
+                        .ToList()
+                })
+                .ToList()
+        };
+    }
+
+    private static WorkoutDay ToEntity(WorkoutDayRequest req, IReadOnlyDictionary<Guid, Exercise>? exerciseLookup = null) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = string.IsNullOrWhiteSpace(req.Name) ? $"Day {req.DayNumber}" : req.Name.Trim(),
+        DayNumber = req.DayNumber,
+        Exercises = (req.Exercises ?? new List<WorkoutExerciseRequest>())
+            .OrderBy(e => e.Order)
+            .Select(e =>
+            {
+                Exercise? linkedExercise = null;
+                if (e.ExerciseId.HasValue && exerciseLookup is not null)
+                {
+                    exerciseLookup.TryGetValue(e.ExerciseId.Value, out linkedExercise);
+                }
+
+                return new WorkoutExercise
+                {
+                    Id = Guid.NewGuid(),
+                    ExerciseId = linkedExercise?.Id,
+                    ExerciseName = linkedExercise?.Name ?? e.ExerciseName?.Trim(),
+                    Sets = e.Sets,
+                    Reps = e.Reps,
+                    RestSeconds = e.RestSeconds,
+                    Tempo = e.Tempo,
+                    Notes = e.Notes,
+                    Order = e.Order
+                };
+            })
+            .ToList()
+    };
+
+    private static ExerciseDto? ToExerciseDto(Exercise? exercise) =>
+        exercise is null
+            ? null
+            : new ExerciseDto(
+                exercise.Id,
+                exercise.CoachId,
+                exercise.Name,
+                exercise.Description,
+                SplitCsv(exercise.MuscleGroups),
+                SplitCsv(exercise.Tags),
+                exercise.Equipment,
+                exercise.VideoUrl,
+                exercise.CreatedAt,
+                exercise.UpdatedAt);
+
+    private static async Task<(Dictionary<Guid, Exercise> Lookup, IResult? Error)> ValidateExercises(
+        AppDbContext db,
+        Guid coachId,
+        IEnumerable<WorkoutDayRequest> days)
+    {
+        var exerciseIds = days
+            .SelectMany(d => d.Exercises ?? new List<WorkoutExerciseRequest>())
+            .Where(e => e.ExerciseId.HasValue)
+            .Select(e => e.ExerciseId!.Value)
+            .Distinct()
+            .ToList();
+
+        if (!exerciseIds.Any())
+        {
+            return (new Dictionary<Guid, Exercise>(), null);
+        }
+
+        var exercises = await db.Exercises
+            .Where(e => exerciseIds.Contains(e.Id) && e.CoachId == coachId)
+            .ToDictionaryAsync(e => e.Id);
+
+        if (exercises.Count != exerciseIds.Count)
+        {
+            return (new Dictionary<Guid, Exercise>(), Results.BadRequest(new { message = "One or more exercises are invalid or unavailable." }));
+        }
+
+        return (exercises, null);
+    }
+
+    private static List<string> SplitCsv(string? value) =>
+        (value ?? string.Empty)
+            .Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
 }
 
 public record WorkoutExerciseRequest(Guid? ExerciseId, string? ExerciseName, int Sets, string Reps, int RestSeconds, string? Tempo, string? Notes, int Order);
@@ -313,7 +440,7 @@ public record CreateWorkoutPlanRequest(string Name, string? Description, int Dur
 public record UpdateWorkoutPlanRequest(string? Name, string? Description, int? DurationWeeks, List<WorkoutDayRequest>? Days);
 public record AssignWorkoutPlanRequest(Guid ClientId, Guid WorkoutPlanId, DateTime StartDate);
 
-public record WorkoutExerciseDto(Guid Id, Guid? ExerciseId, string? ExerciseName, int Sets, string Reps, int RestSeconds, string? Tempo, string? Notes, int Order);
+public record WorkoutExerciseDto(Guid Id, Guid? ExerciseId, string? ExerciseName, int Sets, string Reps, int RestSeconds, string? Tempo, string? Notes, int Order, ExerciseDto? Exercise);
 public record WorkoutDayDto(Guid Id, string Name, int DayNumber, List<WorkoutExerciseDto> Exercises);
 public record WorkoutPlanDto(Guid Id, Guid CoachId, string Name, string? Description, int DurationWeeks, DateTime CreatedAt, DateTime UpdatedAt, List<WorkoutDayDto> Days);
 public record ClientWorkoutPlanDto(Guid Id, Guid ClientId, Guid WorkoutPlanId, DateTime StartDate, DateTime? EndDate, bool IsActive);

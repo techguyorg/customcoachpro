@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Plus, Dumbbell, MoreHorizontal, Trash2, Users } from "lucide-react";
+import { Plus, Dumbbell, MoreHorizontal, Trash2, Users, Copy } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,17 @@ import { useToast } from "@/hooks/use-toast";
 import workoutPlanService from "@/services/workoutPlanService";
 import type { WorkoutPlan } from "@/types";
 
-function PlanCard({ plan, onAssign, onDelete }: { plan: WorkoutPlan; onAssign: () => void; onDelete: () => void }) {
+function PlanCard({
+  plan,
+  onAssign,
+  onDelete,
+  onDuplicate,
+}: {
+  plan: WorkoutPlan;
+  onAssign: () => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+}) {
   const navigate = useNavigate();
 
   return (
@@ -27,8 +37,8 @@ function PlanCard({ plan, onAssign, onDelete }: { plan: WorkoutPlan; onAssign: (
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-secondary/10 group-hover:bg-secondary/20 transition-colors">
-              <Dumbbell className="h-5 w-5 text-secondary" />
+            <div className="p-2 rounded-lg bg-icon-workout/10 group-hover:bg-icon-workout/20 transition-colors">
+              <Dumbbell className="h-5 w-5 text-icon-workout" />
             </div>
             <div>
               <CardTitle className="text-lg">{plan.name}</CardTitle>
@@ -58,6 +68,15 @@ function PlanCard({ plan, onAssign, onDelete }: { plan: WorkoutPlan; onAssign: (
               >
                 <Users className="h-4 w-4 mr-2" />
                 Assign to Client
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDuplicate();
+                }}
+              >
+                <Copy className="h-4 w-4 mr-2" />
+                Duplicate
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={(e) => {
@@ -136,6 +155,22 @@ export function WorkoutPlansPage() {
     },
   });
 
+  const duplicateMutation = useMutation({
+    mutationFn: (planId: string) => workoutPlanService.duplicate(planId),
+    onSuccess: (plan) => {
+      toast({ title: "Plan duplicated", description: "You can now edit the copy." });
+      queryClient.invalidateQueries({ queryKey: ["workout-plans"] });
+      navigate(`/workout-plans/${plan.id}/edit`);
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to duplicate plan",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDelete = (planId: string) => {
     const confirmDelete = window.confirm("Are you sure you want to delete this workout plan?");
     if (!confirmDelete) return;
@@ -180,6 +215,7 @@ export function WorkoutPlansPage() {
               plan={plan}
               onAssign={() => navigate(`/workout-plans/${plan.id}/assign`)}
               onDelete={() => handleDelete(plan.id)}
+              onDuplicate={() => duplicateMutation.mutate(plan.id)}
             />
           ))}
         </div>

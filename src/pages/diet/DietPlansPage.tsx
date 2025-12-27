@@ -48,8 +48,8 @@ function PlanCard({ plan, onAssign, onDelete }: { plan: DietPlan; onAssign: () =
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-accent/10 group-hover:bg-accent/20 transition-colors">
-              <Utensils className="h-5 w-5 text-accent" />
+            <div className="p-2 rounded-lg bg-icon-diet/10 group-hover:bg-icon-diet/20 transition-colors">
+              <Utensils className="h-5 w-5 text-icon-diet" />
             </div>
             <div>
               <CardTitle className="text-lg">{plan.name}</CardTitle>
@@ -144,7 +144,16 @@ export function DietPlansPage() {
     queryFn: () => dietPlanService.list(),
   });
 
-  const templates = useMemo(() => buildDietTemplates(meals), [meals]);
+  const { data: remoteTemplates = [] } = useQuery({
+    queryKey: ["diet-plan-templates"],
+    queryFn: () => dietPlanService.templates(),
+    retry: false,
+  });
+
+  const templates = useMemo(
+    () => (remoteTemplates.length ? remoteTemplates : buildDietTemplates(meals)),
+    [remoteTemplates, meals]
+  );
 
   useEffect(() => {
     if (foods.length === 0) return;
@@ -308,7 +317,7 @@ export function DietPlansPage() {
               {templates.map((template) => (
                 <div key={template.name} className="border rounded-lg p-3 space-y-2">
                   <div className="flex items-center gap-2">
-                    <Leaf className="h-4 w-4 text-accent" />
+                    <Leaf className="h-4 w-4 text-icon-diet" />
                     <div className="font-medium">{template.name}</div>
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-2">{template.description}</p>

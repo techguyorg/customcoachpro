@@ -96,18 +96,15 @@ class ApiService {
 
     const response = await this.performFetch(url, headers, options);
 
-    if (response.status === 401 && !hasRetried) {
-      const refreshed = await this.tryRefreshToken();
+    if (response.status === 401) {
+      if (!hasRetried) {
+        const refreshed = await this.tryRefreshToken();
 
-      if (refreshed) {
-        return this.request<T>(endpoint, options, true);
+        if (refreshed) {
+          return this.request<T>(endpoint, options, true);
+        }
       }
 
-      await this.handleUnauthorized();
-      throw new Error("Unauthorized");
-    }
-
-    if (response.status === 401) {
       await this.handleUnauthorized();
       throw new Error("Unauthorized");
     }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -14,6 +14,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import coachService from "@/services/coachService";
 
+type UnitSystem = "imperial" | "metric";
+
 const schema = z.object({
   displayName: z.string().min(2, "Display name must be at least 2 characters"),
   bio: z.string().optional(),
@@ -21,9 +23,28 @@ const schema = z.object({
   targetWeight: z.number().positive("Weight must be positive").optional(),
   startWeight: z.number().positive("Weight must be positive").optional(),
   heightCm: z.number().positive("Height must be positive").optional(),
+  neckCm: z.number().positive("Neck must be positive").optional(),
+  armsCm: z.number().positive("Arms must be positive").optional(),
+  quadsCm: z.number().positive("Quads must be positive").optional(),
+  hipsCm: z.number().positive("Hips must be positive").optional(),
 });
 
 type FormData = z.infer<typeof schema>;
+
+const INCH_TO_CM = 2.54;
+const LB_TO_KG = 0.45359237;
+
+const convertLength = (value: number | undefined, from: UnitSystem, to: UnitSystem) => {
+  if (value === undefined || Number.isNaN(value)) return undefined;
+  if (from === to) return value;
+  return from === "imperial" ? Number((value * INCH_TO_CM).toFixed(1)) : Number((value / INCH_TO_CM).toFixed(1));
+};
+
+const convertWeight = (value: number | undefined, from: UnitSystem, to: UnitSystem) => {
+  if (value === undefined || Number.isNaN(value)) return undefined;
+  if (from === to) return value;
+  return from === "imperial" ? Number((value * LB_TO_KG).toFixed(1)) : Number((value / LB_TO_KG).toFixed(1));
+};
 
 export function EditClientPage() {
   const { id } = useParams();
@@ -32,6 +53,7 @@ export function EditClientPage() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>("imperial");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["coach", "client", clientId],
@@ -39,28 +61,49 @@ export function EditClientPage() {
     enabled: !!clientId,
   });
 
-  const defaultValues = useMemo<FormData | undefined>(() => {
-    if (!data) return undefined;
-    const p = data.profile;
-    return {
-      displayName: p.displayName ?? data.email,
-      bio: p.bio ?? "",
-      currentWeight: p.currentWeight ?? undefined,
-      targetWeight: p.targetWeight ?? undefined,
-      startWeight: p.startWeight ?? undefined,
-      heightCm: p.heightCm ?? undefined,
-    };
-  }, [data]);
-
-  const { register, handleSubmit, formState: { errors }, reset } = useForm<FormData>({
+  const { register, handleSubmit, formState: { errors }, reset, getValues, setValue, watch } = useForm<FormData>({
     resolver: zodResolver(schema),
-    values: defaultValues,
   });
 
-  // ensure form updates once data loads
-  if (defaultValues && !saving) {
-    // react-hook-form already uses "values"; no need to reset
-  }
+  useEffect(() => {
+    if (!data) return;
+    const preferred = (data.profile.preferredUnitSystem as UnitSystem | undefined) ?? "imperial";
+    setUnitSystem(preferred);
+
+    const profile = data.profile;
+    reset({
+      displayName: profile.displayName ?? data.email,
+      bio: profile.bio ?? "",
+      currentWeight: profile.currentWeight ?? undefined,
+      targetWeight: profile.targetWeight ?? undefined,
+      startWeight: profile.startWeight ?? undefined,
+      heightCm: convertLength(profile.heightCm ?? undefined, "metric", preferred),
+      neckCm: convertLength(profile.neckCm ?? undefined, "metric", preferred),
+      armsCm: convertLength(profile.armsCm ?? undefined, "metric", preferred),
+      quadsCm: convertLength(profile.quadsCm ?? undefined, "metric", preferred),
+      hipsCm: convertLength(profile.hipsCm ?? undefined, "metric", preferred),
+    });
+  }, [data, reset]);
+
+  const weightLabel = useMemo(() => (unitSystem === "imperial" ? "lbs" : "kg"), [unitSystem]);
+  const lengthLabel = useMemo(() => (unitSystem === "imperial" ? "inches" : "cm"), [unitSystem]);
+
+  const handleUnitChange = (next: UnitSystem) => {
+    if (next === unitSystem) return;
+    const values = getValues();
+
+    setValue("startWeight", convertWeight(values.startWeight, unitSystem, next));
+    setValue("currentWeight", convertWeight(values.currentWeight, unitSystem, next));
+    setValue("targetWeight", convertWeight(values.targetWeight, unitSystem, next));
+
+    setValue("heightCm", convertLength(values.heightCm, unitSystem, next));
+    setValue("neckCm", convertLength(values.neckCm, unitSystem, next));
+    setValue("armsCm", convertLength(values.armsCm, unitSystem, next));
+    setValue("quadsCm", convertLength(values.quadsCm, unitSystem, next));
+    setValue("hipsCm", convertLength(values.hipsCm, unitSystem, next));
+
+    setUnitSystem(next);
+  };
 
   const onSubmit = async (values: FormData) => {
     try {
@@ -68,10 +111,15 @@ export function EditClientPage() {
       await coachService.updateClient(clientId, {
         displayName: values.displayName,
         bio: values.bio,
+        preferredUnitSystem: unitSystem,
         startWeight: values.startWeight,
         currentWeight: values.currentWeight,
         targetWeight: values.targetWeight,
-        heightCm: values.heightCm,
+        heightCm: convertLength(values.heightCm, unitSystem, "metric"),
+        neckCm: convertLength(values.neckCm, unitSystem, "metric"),
+        armsCm: convertLength(values.armsCm, unitSystem, "metric"),
+        quadsCm: convertLength(values.quadsCm, unitSystem, "metric"),
+        hipsCm: convertLength(values.hipsCm, unitSystem, "metric"),
       });
 
       await qc.invalidateQueries({ queryKey: ["coach", "client", clientId] });
@@ -147,22 +195,46 @@ export function EditClientPage() {
             <CardDescription>Weights and measurements</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Button type="button" variant={unitSystem === "imperial" ? "default" : "outline"} onClick={() => handleUnitChange("imperial")}>
+                Imperial (lbs/in)
+              </Button>
+              <Button type="button" variant={unitSystem === "metric" ? "default" : "outline"} onClick={() => handleUnitChange("metric")}>
+                Metric (kg/cm)
+              </Button>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startWeight">Start Weight</Label>
+                <Label htmlFor="startWeight">Start Weight ({weightLabel})</Label>
                 <Input id="startWeight" type="number" {...register("startWeight", { valueAsNumber: true })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="currentWeight">Current Weight</Label>
+                <Label htmlFor="currentWeight">Current Weight ({weightLabel})</Label>
                 <Input id="currentWeight" type="number" {...register("currentWeight", { valueAsNumber: true })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="targetWeight">Target Weight</Label>
+                <Label htmlFor="targetWeight">Target Weight ({weightLabel})</Label>
                 <Input id="targetWeight" type="number" {...register("targetWeight", { valueAsNumber: true })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="heightCm">Height (cm)</Label>
+                <Label htmlFor="heightCm">Height ({lengthLabel})</Label>
                 <Input id="heightCm" type="number" {...register("heightCm", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="neckCm">Neck ({lengthLabel})</Label>
+                <Input id="neckCm" type="number" {...register("neckCm", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="armsCm">Arms ({lengthLabel})</Label>
+                <Input id="armsCm" type="number" {...register("armsCm", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quadsCm">Quads ({lengthLabel})</Label>
+                <Input id="quadsCm" type="number" {...register("quadsCm", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hipsCm">Hips ({lengthLabel})</Label>
+                <Input id="hipsCm" type="number" {...register("hipsCm", { valueAsNumber: true })} />
               </div>
             </div>
           </CardContent>

@@ -15,9 +15,16 @@ public class UserProfile
     public string? Bio { get; set; }
     public string? AvatarUrl { get; set; }
 
+    // Preferred measurement system: "imperial" or "metric"
+    public string PreferredUnitSystem { get; set; } = "imperial";
+
     // Client basics
     public DateTime? StartDate { get; set; }
     public decimal? HeightCm { get; set; }
+    public decimal? NeckCm { get; set; }
+    public decimal? ArmsCm { get; set; }
+    public decimal? QuadsCm { get; set; }
+    public decimal? HipsCm { get; set; }
 
     // We keep both start and current weight so we can compute change easily
     public decimal? StartWeight { get; set; }
