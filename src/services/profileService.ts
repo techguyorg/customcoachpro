@@ -11,10 +11,15 @@ export type MyProfile = {
     displayName: string;
     bio?: string | null;
     avatarUrl?: string | null;
+    preferredUnitSystem?: "imperial" | "metric";
 
     // client basics
     startDate?: string | null;
     heightCm?: number | null;
+    neckCm?: number | null;
+    armsCm?: number | null;
+    quadsCm?: number | null;
+    hipsCm?: number | null;
     currentWeight?: number | null;
     targetWeight?: number | null;
   };
@@ -24,9 +29,14 @@ export type UpdateMyProfileRequest = {
   displayName: string;
   bio?: string | null;
   avatarUrl?: string | null;
+  preferredUnitSystem?: "imperial" | "metric";
 
   startDate?: string | null;
   heightCm?: number | null;
+  neckCm?: number | null;
+  armsCm?: number | null;
+  quadsCm?: number | null;
+  hipsCm?: number | null;
   currentWeight?: number | null;
   targetWeight?: number | null;
 };

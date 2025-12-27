@@ -19,8 +19,13 @@ export type CoachClientDetail = {
     displayName: string;
     bio?: string | null;
     avatarUrl?: string | null;
+    preferredUnitSystem?: "imperial" | "metric";
     startDate?: string | null;
     heightCm?: number | null;
+    neckCm?: number | null;
+    armsCm?: number | null;
+    quadsCm?: number | null;
+    hipsCm?: number | null;
     startWeight?: number | null;
     currentWeight?: number | null;
     targetWeight?: number | null;
@@ -34,7 +39,12 @@ export type CreateClientRequest = {
   goals?: string;
   notes?: string;
   startDate?: string;
+  preferredUnitSystem?: "imperial" | "metric";
   heightCm?: number;
+  neckCm?: number;
+  armsCm?: number;
+  quadsCm?: number;
+  hipsCm?: number;
   startWeight?: number;
   currentWeight?: number;
   targetWeight?: number;
@@ -46,8 +56,13 @@ export type CreateClientResponse = {
   tempPassword: string;
   profile: {
     displayName: string;
+    preferredUnitSystem?: "imperial" | "metric";
     startDate?: string;
     heightCm?: number;
+    neckCm?: number;
+    armsCm?: number;
+    quadsCm?: number;
+    hipsCm?: number;
     currentWeight?: number;
     targetWeight?: number;
   };
@@ -58,7 +73,12 @@ export type UpdateClientRequest = {
   bio?: string;
   avatarUrl?: string;
   startDate?: string;
+  preferredUnitSystem?: "imperial" | "metric";
   heightCm?: number;
+  neckCm?: number;
+  armsCm?: number;
+  quadsCm?: number;
+  hipsCm?: number;
   startWeight?: number;
   currentWeight?: number;
   targetWeight?: number;
