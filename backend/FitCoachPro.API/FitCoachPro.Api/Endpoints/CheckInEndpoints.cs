@@ -206,8 +206,9 @@ public static class CheckInEndpoints
 
             return Results.Ok(new { ok = true });
         });
+    });
     }
-
+    
     private static (Guid? userId, string role) GetUser(ClaimsPrincipal principal)
     {
         var idStr = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub");
