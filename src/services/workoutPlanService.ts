@@ -34,6 +34,7 @@ export type AssignWorkoutPlanPayload = {
   clientId: string;
   workoutPlanId: string;
   startDate: string;
+  durationDays?: number;
 };
 
 const workoutPlanService = {

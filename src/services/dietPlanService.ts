@@ -31,6 +31,7 @@ export type AssignDietPlanPayload = {
   clientId: string;
   dietPlanId: string;
   startDate: string;
+  durationDays?: number;
 };
 
 export type DietPlanTemplate = {

@@ -554,6 +554,8 @@ public static class DietPlanEndpoints
                     ClientId = req.ClientId,
                     DietPlanId = req.DietPlanId,
                     StartDate = req.StartDate,
+                    DurationDays = req.DurationDays,
+                    EndDate = req.DurationDays.HasValue ? req.StartDate.AddDays(req.DurationDays.Value) : null,
                     IsActive = true
                 };
 
@@ -562,7 +564,8 @@ public static class DietPlanEndpoints
             else
             {
                 existing.StartDate = req.StartDate;
-                existing.EndDate = null;
+                existing.DurationDays = req.DurationDays;
+                existing.EndDate = req.DurationDays.HasValue ? req.StartDate.AddDays(req.DurationDays.Value) : null;
                 existing.IsActive = true;
             }
 
@@ -856,6 +859,7 @@ public static class DietPlanEndpoints
         assignment.DietPlan is null ? null : ToDietPlanDto(assignment.DietPlan),
         assignment.StartDate,
         assignment.EndDate,
+        assignment.DurationDays,
         assignment.IsActive
     );
 }
@@ -871,7 +875,7 @@ public record DietMealRequest(Guid MealId, string MealTime, int Order);
 public record DietDayRequest(int DayNumber, int TargetCalories, int TargetProtein, int TargetCarbs, int TargetFat, List<DietMealRequest> Meals);
 public record CreateDietPlanRequest(string Name, string? Description, List<DietDayRequest> Days, bool? IsPublished);
 public record UpdateDietPlanRequest(string? Name, string? Description, List<DietDayRequest>? Days, bool? IsPublished);
-public record AssignDietPlanRequest(Guid ClientId, Guid DietPlanId, DateTime StartDate);
+public record AssignDietPlanRequest(Guid ClientId, Guid DietPlanId, DateTime StartDate, int? DurationDays);
 public record DietPlanTemplateDto(string Name, string Description, CreateDietPlanRequest Payload);
 
 public record FoodDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, int Calories, int Protein, int Carbs, int Fat, string ServingSize, bool IsPublished, DateTime CreatedAt);
@@ -880,4 +884,4 @@ public record MealDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string
 public record DietMealDto(Guid Id, Guid MealId, MealDto? Meal, string MealTime, int Order);
 public record DietDayDto(Guid Id, int DayNumber, List<DietMealDto> Meals, int TargetCalories, int TargetProtein, int TargetCarbs, int TargetFat);
 public record DietPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, string Goal, List<DietDayDto> Days, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt);
-public record ClientDietPlanDto(Guid Id, Guid ClientId, Guid DietPlanId, DietPlanDto? DietPlan, DateTime StartDate, DateTime? EndDate, bool IsActive);
+public record ClientDietPlanDto(Guid Id, Guid ClientId, Guid DietPlanId, DietPlanDto? DietPlan, DateTime StartDate, DateTime? EndDate, int? DurationDays, bool IsActive);

@@ -266,6 +266,8 @@ public static class WorkoutPlanEndpoints
                     ClientId = req.ClientId,
                     WorkoutPlanId = req.WorkoutPlanId,
                     StartDate = req.StartDate,
+                    DurationDays = req.DurationDays,
+                    EndDate = req.DurationDays.HasValue ? req.StartDate.AddDays(req.DurationDays.Value) : null,
                     IsActive = true
                 };
 
@@ -274,7 +276,8 @@ public static class WorkoutPlanEndpoints
             else
             {
                 existing.StartDate = req.StartDate;
-                existing.EndDate = null;
+                existing.DurationDays = req.DurationDays;
+                existing.EndDate = req.DurationDays.HasValue ? req.StartDate.AddDays(req.DurationDays.Value) : null;
                 existing.IsActive = true;
             }
 
@@ -379,8 +382,10 @@ public static class WorkoutPlanEndpoints
         assignment.Id,
         assignment.ClientId,
         assignment.WorkoutPlanId,
+        assignment.WorkoutPlan is null ? null : ToDto(assignment.WorkoutPlan),
         assignment.StartDate,
         assignment.EndDate,
+        assignment.DurationDays,
         assignment.IsActive
     );
 
@@ -579,9 +584,9 @@ public record WorkoutExerciseRequest(Guid? ExerciseId, string? ExerciseName, int
 public record WorkoutDayRequest(string Name, int DayNumber, List<WorkoutExerciseRequest> Exercises);
 public record CreateWorkoutPlanRequest(string Name, string? Description, int DurationWeeks, List<WorkoutDayRequest> Days, bool? IsPublished);
 public record UpdateWorkoutPlanRequest(string? Name, string? Description, int? DurationWeeks, List<WorkoutDayRequest>? Days, bool? IsPublished);
-public record AssignWorkoutPlanRequest(Guid ClientId, Guid WorkoutPlanId, DateTime StartDate);
+public record AssignWorkoutPlanRequest(Guid ClientId, Guid WorkoutPlanId, DateTime StartDate, int? DurationDays);
 
 public record WorkoutExerciseDto(Guid Id, Guid? ExerciseId, string? ExerciseName, int Sets, string Reps, int RestSeconds, string? Tempo, string? Notes, int Order, ExerciseDto? Exercise);
 public record WorkoutDayDto(Guid Id, string Name, int DayNumber, List<WorkoutExerciseDto> Exercises);
 public record WorkoutPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, string Goal, int DurationWeeks, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt, List<WorkoutDayDto> Days);
-public record ClientWorkoutPlanDto(Guid Id, Guid ClientId, Guid WorkoutPlanId, DateTime StartDate, DateTime? EndDate, bool IsActive);
+public record ClientWorkoutPlanDto(Guid Id, Guid ClientId, Guid WorkoutPlanId, WorkoutPlanDto? WorkoutPlan, DateTime StartDate, DateTime? EndDate, int? DurationDays, bool IsActive);

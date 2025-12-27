@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Mail, Calendar, Target, Scale, TrendingDown, Edit, Ruler } from "lucide-react";
+import { ArrowLeft, Mail, Calendar, Target, Scale, TrendingDown, Edit, Ruler, Dumbbell, Utensils } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import coachService from "@/services/coachService";
+import workoutPlanService from "@/services/workoutPlanService";
+import dietPlanService from "@/services/dietPlanService";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
 type UnitSystem = "imperial" | "metric";
 
@@ -29,7 +34,15 @@ const convertLength = (value: number | undefined, to: UnitSystem) => {
 export function ClientDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [unitSystem, setUnitSystem] = useState<UnitSystem>("imperial");
+  const [selectedWorkoutPlan, setSelectedWorkoutPlan] = useState("");
+  const [workoutStartDate, setWorkoutStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [workoutDuration, setWorkoutDuration] = useState("");
+  const [selectedDietPlan, setSelectedDietPlan] = useState("");
+  const [dietStartDate, setDietStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dietDuration, setDietDuration] = useState("");
 
   const clientId = id ?? "";
 
@@ -37,6 +50,70 @@ export function ClientDetailPage() {
     queryKey: ["coach", "client", clientId],
     queryFn: () => coachService.getClient(clientId),
     enabled: !!clientId,
+  });
+
+  const { data: workoutPlans = [] } = useQuery({
+    queryKey: ["workout-plans"],
+    queryFn: () => workoutPlanService.list(),
+  });
+
+  const { data: dietPlans = [] } = useQuery({
+    queryKey: ["diet-plans"],
+    queryFn: () => dietPlanService.list(),
+  });
+
+  const { data: workoutAssignments = [], isLoading: isLoadingWorkoutAssignments } = useQuery({
+    queryKey: ["client", clientId, "workout-assignments"],
+    queryFn: () => workoutPlanService.listForClient(clientId),
+    enabled: !!clientId,
+  });
+
+  const { data: dietAssignments = [], isLoading: isLoadingDietAssignments } = useQuery({
+    queryKey: ["client", clientId, "diet-assignments"],
+    queryFn: () => dietPlanService.listForClient(clientId),
+    enabled: !!clientId,
+  });
+
+  const assignWorkoutMutation = useMutation({
+    mutationFn: () =>
+      workoutPlanService.assign({
+        clientId,
+        workoutPlanId: selectedWorkoutPlan,
+        startDate: new Date(workoutStartDate).toISOString(),
+        durationDays: workoutDuration ? Number(workoutDuration) : undefined,
+      }),
+    onSuccess: () => {
+      toast({ title: "Workout plan assigned" });
+      queryClient.invalidateQueries({ queryKey: ["client", clientId, "workout-assignments"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to assign workout plan",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const assignDietMutation = useMutation({
+    mutationFn: () =>
+      dietPlanService.assign({
+        clientId,
+        dietPlanId: selectedDietPlan,
+        startDate: new Date(dietStartDate).toISOString(),
+        durationDays: dietDuration ? Number(dietDuration) : undefined,
+      }),
+    onSuccess: () => {
+      toast({ title: "Diet plan assigned" });
+      queryClient.invalidateQueries({ queryKey: ["client", clientId, "diet-assignments"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to assign diet plan",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -87,6 +164,17 @@ export function ClientDetailPage() {
   const weightLost = Math.max(0, startWeight - currentWeight);
   const totalToLose = Math.max(0, startWeight - targetWeight);
   const progressPercentage = totalToLose > 0 ? Math.round((weightLost / totalToLose) * 100) : 0;
+
+  const activeWorkoutAssignment = workoutAssignments.find((a) => a.isActive) ?? workoutAssignments[0];
+  const activeDietAssignment = dietAssignments.find((a) => a.isActive) ?? dietAssignments[0];
+
+  const assignedWorkoutPlan =
+    activeWorkoutAssignment?.workoutPlan ||
+    workoutPlans.find((plan) => plan.id === activeWorkoutAssignment?.workoutPlanId);
+  const assignedDietPlan =
+    activeDietAssignment?.dietPlan || dietPlans.find((plan) => plan.id === activeDietAssignment?.dietPlanId);
+
+  const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleDateString() : "Not set");
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -276,15 +364,217 @@ export function ClientDetailPage() {
         </TabsContent>
 
         <TabsContent value="plans">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Assigned Plans</CardTitle>
-              <CardDescription>Planned in Sprint 3</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">No plans assigned yet.</p>
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-md bg-primary/10 p-2">
+                    <Dumbbell className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Workout Plan</CardTitle>
+                    <CardDescription>Assign a training program and track it here.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {activeWorkoutAssignment ? (
+                  <div className="rounded-lg border border-primary/20 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{assignedWorkoutPlan?.name ?? "Assigned plan"}</p>
+                        {assignedWorkoutPlan?.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">{assignedWorkoutPlan.description}</p>
+                        )}
+                      </div>
+                      <Badge variant={activeWorkoutAssignment.isActive ? "secondary" : "outline"}>
+                        {activeWorkoutAssignment.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>Start: {formatDate(activeWorkoutAssignment.startDate)}</span>
+                      </div>
+                      {activeWorkoutAssignment.durationDays && (
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4" />
+                          <span>
+                            Duration: {activeWorkoutAssignment.durationDays} day{activeWorkoutAssignment.durationDays > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      )}
+                      {activeWorkoutAssignment.endDate && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>Ends: {formatDate(activeWorkoutAssignment.endDate)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">No workout plan assigned yet.</p>
+                )}
+
+                <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); assignWorkoutMutation.mutate(); }}>
+                  <div className="space-y-2">
+                    <Label htmlFor="workoutPlan">Assign plan</Label>
+                    <select
+                      id="workoutPlan"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      value={selectedWorkoutPlan}
+                      onChange={(e) => setSelectedWorkoutPlan(e.target.value)}
+                    >
+                      <option value="">Select a workout plan</option>
+                      {workoutPlans.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="workoutStart">Start date</Label>
+                      <Input
+                        id="workoutStart"
+                        type="date"
+                        value={workoutStartDate}
+                        onChange={(e) => setWorkoutStartDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="workoutDuration">Duration (days)</Label>
+                      <Input
+                        id="workoutDuration"
+                        type="number"
+                        min={1}
+                        placeholder="Optional"
+                        value={workoutDuration}
+                        onChange={(e) => setWorkoutDuration(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      className="shadow-energy"
+                      disabled={assignWorkoutMutation.isPending || !selectedWorkoutPlan}
+                    >
+                      {assignWorkoutMutation.isPending ? "Assigning..." : "Assign workout plan"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <div className="rounded-md bg-energy/10 p-2">
+                    <Utensils className="h-5 w-5 text-energy" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Diet Plan</CardTitle>
+                    <CardDescription>Assign a nutrition program and track it here.</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {activeDietAssignment ? (
+                  <div className="rounded-lg border border-energy/30 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{assignedDietPlan?.name ?? "Assigned plan"}</p>
+                        {assignedDietPlan?.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">{assignedDietPlan.description}</p>
+                        )}
+                      </div>
+                      <Badge variant={activeDietAssignment.isActive ? "secondary" : "outline"}>
+                        {activeDietAssignment.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>Start: {formatDate(activeDietAssignment.startDate)}</span>
+                      </div>
+                      {activeDietAssignment.durationDays && (
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4" />
+                          <span>
+                            Duration: {activeDietAssignment.durationDays} day{activeDietAssignment.durationDays > 1 ? "s" : ""}
+                          </span>
+                        </div>
+                      )}
+                      {activeDietAssignment.endDate && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          <span>Ends: {formatDate(activeDietAssignment.endDate)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">No diet plan assigned yet.</p>
+                )}
+
+                <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); assignDietMutation.mutate(); }}>
+                  <div className="space-y-2">
+                    <Label htmlFor="dietPlan">Assign plan</Label>
+                    <select
+                      id="dietPlan"
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      value={selectedDietPlan}
+                      onChange={(e) => setSelectedDietPlan(e.target.value)}
+                    >
+                      <option value="">Select a diet plan</option>
+                      {dietPlans.map((plan) => (
+                        <option key={plan.id} value={plan.id}>
+                          {plan.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="dietStart">Start date</Label>
+                      <Input
+                        id="dietStart"
+                        type="date"
+                        value={dietStartDate}
+                        onChange={(e) => setDietStartDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="dietDuration">Duration (days)</Label>
+                      <Input
+                        id="dietDuration"
+                        type="number"
+                        min={1}
+                        placeholder="Optional"
+                        value={dietDuration}
+                        onChange={(e) => setDietDuration(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      className="shadow-energy"
+                      disabled={assignDietMutation.isPending || !selectedDietPlan}
+                    >
+                      {assignDietMutation.isPending ? "Assigning..." : "Assign diet plan"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="photos">

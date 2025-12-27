@@ -55,6 +55,7 @@ public class ClientWorkoutPlan
     public Guid WorkoutPlanId { get; set; }
     public DateTime StartDate { get; set; }
     public DateTime? EndDate { get; set; }
+    public int? DurationDays { get; set; }
     public bool IsActive { get; set; } = true;
 
     public WorkoutPlan? WorkoutPlan { get; set; }
