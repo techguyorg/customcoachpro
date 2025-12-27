@@ -85,6 +85,7 @@ export const API_ENDPOINTS = {
     base: "/diet-plans",
     byId: (id: string) => `/diet-plans/${id}`,
     byCoach: (coachId: string) => `/diet-plans/coach/${coachId}`,
+    templates: "/diet-plans/templates",
     assign: "/diet-plans/assign",
     clientPlans: (clientId: string) => `/diet-plans/client/${clientId}`,
   },

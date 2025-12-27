@@ -20,7 +20,16 @@ export function CreateDietPlanPage() {
     queryFn: () => mealService.list(),
   });
 
-  const templates = useMemo(() => buildDietTemplates(meals), [meals]);
+  const { data: remoteTemplates = [] } = useQuery({
+    queryKey: ["diet-plan-templates"],
+    queryFn: () => dietPlanService.templates(),
+    retry: false,
+  });
+
+  const templates = useMemo(
+    () => (remoteTemplates.length ? remoteTemplates : buildDietTemplates(meals)),
+    [remoteTemplates, meals]
+  );
 
   const createMutation = useMutation({
     mutationFn: (payload: DietPlanPayload) => dietPlanService.create(payload),
