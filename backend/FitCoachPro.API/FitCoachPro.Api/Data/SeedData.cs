@@ -177,4 +177,218 @@ public static class SeedData
 
         db.SaveChanges();
     }
+
+    private static void SeedSystemCatalog(AppDbContext db)
+    {
+        // Seed a lightweight global library that all coaches/clients can see (CoachId == Guid.Empty).
+        var systemOwner = Guid.Empty;
+        var now = DateTime.UtcNow;
+
+        if (!db.Exercises.Any(e => e.CoachId == systemOwner))
+        {
+            var systemExercises = new[]
+            {
+                new Exercise
+                {
+                    Id = Guid.NewGuid(),
+                    CoachId = systemOwner,
+                    Name = "Push-up",
+                    Description = "Bodyweight horizontal press",
+                    MuscleGroups = "Chest,Triceps,Shoulders,Core",
+                    Tags = "bodyweight,push",
+                    Equipment = "None",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                },
+                new Exercise
+                {
+                    Id = Guid.NewGuid(),
+                    CoachId = systemOwner,
+                    Name = "Goblet Squat",
+                    Description = "Kettlebell or dumbbell front-loaded squat",
+                    MuscleGroups = "Quads,Glutes,Core",
+                    Tags = "dumbbell,legs,squat",
+                    Equipment = "Dumbbell/Kettlebell",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                },
+                new Exercise
+                {
+                    Id = Guid.NewGuid(),
+                    CoachId = systemOwner,
+                    Name = "Romanian Deadlift",
+                    Description = "Hip hinge for posterior chain",
+                    MuscleGroups = "Hamstrings,Glutes,Back",
+                    Tags = "barbell,hinge,posterior",
+                    Equipment = "Barbell",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                },
+                new Exercise
+                {
+                    Id = Guid.NewGuid(),
+                    CoachId = systemOwner,
+                    Name = "Seated Cable Row",
+                    Description = "Horizontal pull for mid-back",
+                    MuscleGroups = "Back,Biceps",
+                    Tags = "cable,row,pull",
+                    Equipment = "Cable machine",
+                    CreatedAt = now,
+                    UpdatedAt = now
+                }
+            };
+
+            db.Exercises.AddRange(systemExercises);
+
+            // A simple system workout template (3-day full body)
+            var fullBodyPlan = new WorkoutPlan
+            {
+                Id = Guid.NewGuid(),
+                CoachId = systemOwner,
+                Name = "Full Body Foundations",
+                Description = "3-day template covering push, pull, and lower",
+                DurationWeeks = 4,
+                CreatedAt = now,
+                UpdatedAt = now,
+                Days =
+                {
+                    new WorkoutDay
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "Day 1",
+                        DayNumber = 1,
+                        Exercises =
+                        {
+                            new WorkoutExercise
+                            {
+                                Id = Guid.NewGuid(),
+                                ExerciseId = systemExercises[0].Id,
+                                ExerciseName = systemExercises[0].Name,
+                                Sets = 3,
+                                Reps = "10-12",
+                                RestSeconds = 90,
+                                Order = 1
+                            },
+                            new WorkoutExercise
+                            {
+                                Id = Guid.NewGuid(),
+                                ExerciseId = systemExercises[2].Id,
+                                ExerciseName = systemExercises[2].Name,
+                                Sets = 3,
+                                Reps = "8-10",
+                                RestSeconds = 120,
+                                Order = 2
+                            }
+                        }
+                    },
+                    new WorkoutDay
+                    {
+                        Id = Guid.NewGuid(),
+                        Name = "Day 2",
+                        DayNumber = 2,
+                        Exercises =
+                        {
+                            new WorkoutExercise
+                            {
+                                Id = Guid.NewGuid(),
+                                ExerciseId = systemExercises[1].Id,
+                                ExerciseName = systemExercises[1].Name,
+                                Sets = 3,
+                                Reps = "10-12",
+                                RestSeconds = 90,
+                                Order = 1
+                            },
+                            new WorkoutExercise
+                            {
+                                Id = Guid.NewGuid(),
+                                ExerciseId = systemExercises[3].Id,
+                                ExerciseName = systemExercises[3].Name,
+                                Sets = 3,
+                                Reps = "12-15",
+                                RestSeconds = 75,
+                                Order = 2
+                            }
+                        }
+                    }
+                }
+            };
+
+            db.WorkoutPlans.Add(fullBodyPlan);
+        }
+
+        if (!db.Foods.Any(f => f.CoachId == systemOwner))
+        {
+            var foods = new[]
+            {
+                new Food { Id = Guid.NewGuid(), CoachId = systemOwner, Name = "Chicken Breast", Calories = 165, Protein = 31, Carbs = 0, Fat = 4, ServingSize = "100g", CreatedAt = now },
+                new Food { Id = Guid.NewGuid(), CoachId = systemOwner, Name = "Brown Rice (cooked)", Calories = 110, Protein = 2, Carbs = 23, Fat = 1, ServingSize = "100g", CreatedAt = now },
+                new Food { Id = Guid.NewGuid(), CoachId = systemOwner, Name = "Broccoli", Calories = 35, Protein = 3, Carbs = 7, Fat = 0, ServingSize = "100g", CreatedAt = now },
+                new Food { Id = Guid.NewGuid(), CoachId = systemOwner, Name = "Greek Yogurt (non-fat)", Calories = 59, Protein = 10, Carbs = 3, Fat = 0, ServingSize = "100g", CreatedAt = now }
+            };
+            db.Foods.AddRange(foods);
+
+            var meal1Id = Guid.NewGuid();
+            var meal1 = new Meal
+            {
+                Id = meal1Id,
+                CoachId = systemOwner,
+                Name = "Chicken, Rice & Broccoli",
+                Description = "Balanced protein and carbs",
+                CreatedAt = now,
+                Foods =
+                {
+                    new MealFood { Id = Guid.NewGuid(), FoodId = foods[0].Id, Quantity = 150 },
+                    new MealFood { Id = Guid.NewGuid(), FoodId = foods[1].Id, Quantity = 180 },
+                    new MealFood { Id = Guid.NewGuid(), FoodId = foods[2].Id, Quantity = 120 },
+                }
+            };
+
+            var meal2Id = Guid.NewGuid();
+            var meal2 = new Meal
+            {
+                Id = meal2Id,
+                CoachId = systemOwner,
+                Name = "Greek Yogurt & Berries",
+                Description = "High-protein snack",
+                CreatedAt = now,
+                Foods =
+                {
+                    new MealFood { Id = Guid.NewGuid(), FoodId = foods[3].Id, Quantity = 200 }
+                }
+            };
+
+            db.Meals.AddRange(meal1, meal2);
+
+            var dietPlan = new DietPlan
+            {
+                Id = Guid.NewGuid(),
+                CoachId = systemOwner,
+                Name = "Lean Recomp (2k cal)",
+                Description = "Two meals per day starter",
+                CreatedAt = now,
+                UpdatedAt = now,
+                Days =
+                {
+                    new DietDay
+                    {
+                        Id = Guid.NewGuid(),
+                        DayNumber = 1,
+                        TargetCalories = 2000,
+                        TargetProtein = 160,
+                        TargetCarbs = 180,
+                        TargetFat = 60,
+                        Meals =
+                        {
+                            new DietMeal { Id = Guid.NewGuid(), MealId = meal1Id, MealTime = "Lunch", Order = 1 },
+                            new DietMeal { Id = Guid.NewGuid(), MealId = meal2Id, MealTime = "Dinner", Order = 2 },
+                        }
+                    }
+                }
+            };
+
+            db.DietPlans.Add(dietPlan);
+        }
+
+        db.SaveChanges();
+    }
 }

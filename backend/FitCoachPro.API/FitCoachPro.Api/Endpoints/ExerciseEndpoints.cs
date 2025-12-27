@@ -171,6 +171,8 @@ public static class ExerciseEndpoints
 
     private static IQueryable<Exercise> GetScopedExercises(AppDbContext db, Guid userId, string role)
     {
+        var systemOwner = Guid.Empty;
+
         if (role == "coach")
         {
             return db.Exercises.Where(e => e.CoachId == userId || e.IsPublished);
