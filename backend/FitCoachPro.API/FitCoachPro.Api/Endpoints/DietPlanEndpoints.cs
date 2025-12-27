@@ -22,13 +22,26 @@ public static class DietPlanEndpoints
 
     private static void MapFoodEndpoints(RouteGroupBuilder group)
     {
-        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db) =>
+        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db, string? search, int? minCalories, int? maxCalories, int? minProtein, int? maxProtein) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
             if (role is not ("coach" or "client")) return Results.Forbid();
 
-            var foods = await GetScopedFoods(db, userId.Value, role)
+            var foodsQuery = GetScopedFoods(db, userId.Value, role);
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var term = search.Trim().ToLowerInvariant();
+                foodsQuery = foodsQuery.Where(f => f.Name.ToLower().Contains(term));
+            }
+
+            if (minCalories.HasValue) foodsQuery = foodsQuery.Where(f => f.Calories >= minCalories.Value);
+            if (maxCalories.HasValue) foodsQuery = foodsQuery.Where(f => f.Calories <= maxCalories.Value);
+            if (minProtein.HasValue) foodsQuery = foodsQuery.Where(f => f.Protein >= minProtein.Value);
+            if (maxProtein.HasValue) foodsQuery = foodsQuery.Where(f => f.Protein <= maxProtein.Value);
+
+            var foods = await foodsQuery
                 .OrderBy(f => f.Name)
                 .ToListAsync();
 
@@ -129,7 +142,7 @@ public static class DietPlanEndpoints
 
     private static void MapMealEndpoints(RouteGroupBuilder group)
     {
-        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db) =>
+        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db, string? search, string? mealTime, int? minCalories, int? maxCalories, int? minProtein, int? maxProtein) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
@@ -139,7 +152,27 @@ public static class DietPlanEndpoints
                 .OrderBy(m => m.Name)
                 .ToListAsync();
 
-            return Results.Ok(new { data = meals.Select(ToMealDto), success = true });
+            if (!string.IsNullOrWhiteSpace(mealTime))
+            {
+                meals = meals.Where(m => m.DietMeals.Any(dm => dm.MealTime.Equals(mealTime, StringComparison.OrdinalIgnoreCase))).ToList();
+            }
+
+            var dtos = meals.Select(ToMealDto).ToList();
+            var filtered = dtos.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                filtered = filtered.Where(m =>
+                    m.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(m.Description) && m.Description.Contains(search, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            if (minCalories.HasValue) filtered = filtered.Where(m => m.TotalCalories >= minCalories.Value);
+            if (maxCalories.HasValue) filtered = filtered.Where(m => m.TotalCalories <= maxCalories.Value);
+            if (minProtein.HasValue) filtered = filtered.Where(m => m.TotalProtein >= minProtein.Value);
+            if (maxProtein.HasValue) filtered = filtered.Where(m => m.TotalProtein <= maxProtein.Value);
+
+            return Results.Ok(new { data = filtered.ToList(), success = true });
         });
 
         group.MapGet("/{id:guid}", async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
@@ -270,7 +303,7 @@ public static class DietPlanEndpoints
 
     private static void MapPlanEndpoints(RouteGroupBuilder group)
     {
-        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db) =>
+        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db, string? search, string? goal) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
@@ -279,7 +312,22 @@ public static class DietPlanEndpoints
             var plans = await GetScopedPlans(db, userId.Value, role)
                 .ToListAsync();
 
-            return Results.Ok(new { data = plans.Select(ToDietPlanDto), success = true });
+            var dtos = plans.Select(ToDietPlanDto).ToList();
+            var filtered = dtos.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                filtered = filtered.Where(p =>
+                    p.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(p.Description) && p.Description.Contains(search, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(goal))
+            {
+                filtered = filtered.Where(p => p.Goal.Equals(goal, StringComparison.OrdinalIgnoreCase));
+            }
+
+            return Results.Ok(new { data = filtered.ToList(), success = true });
         });
 
         group.MapGet("/{id:guid}", async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
@@ -464,6 +512,28 @@ public static class DietPlanEndpoints
             return Results.Ok(new { success = true });
         });
 
+        group.MapPost("/{id:guid}/duplicate", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
+        {
+            var (coachId, role) = GetUser(principal);
+            if (coachId is null || role != "coach") return Results.Forbid();
+
+            var plan = await db.DietPlans
+                .Include(p => p.Days)!.ThenInclude(d => d.Meals)
+                .FirstOrDefaultAsync(p => p.Id == id && (p.CoachId == coachId || p.IsPublished));
+
+            if (plan is null) return Results.NotFound();
+
+            var duplicate = DuplicateDietPlan(plan, coachId.Value);
+
+            db.DietPlans.Add(duplicate);
+            await db.SaveChangesAsync();
+
+            var hydrated = await GetScopedPlans(db, coachId.Value, role)
+                .FirstAsync(p => p.Id == duplicate.Id);
+
+            return Results.Ok(new { data = ToDietPlanDto(hydrated), success = true });
+        });
+
         group.MapPost("/assign", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, AssignDietPlanRequest req) =>
         {
             var (coachId, role) = GetUser(principal);
@@ -500,6 +570,45 @@ public static class DietPlanEndpoints
 
             return Results.Ok(new { data = ToClientDietPlanDto(existing), success = true });
         });
+    }
+
+    private static DietPlan DuplicateDietPlan(DietPlan plan, Guid coachId)
+    {
+        var now = DateTime.UtcNow;
+
+        return new DietPlan
+        {
+            Id = Guid.NewGuid(),
+            CoachId = coachId,
+            CreatedBy = coachId,
+            Name = $"{plan.Name} (Copy)",
+            Description = plan.Description,
+            CreatedAt = now,
+            UpdatedAt = now,
+            IsPublished = false,
+            Days = plan.Days
+                .OrderBy(d => d.DayNumber)
+                .Select(d => new DietDay
+                {
+                    Id = Guid.NewGuid(),
+                    DayNumber = d.DayNumber,
+                    TargetCalories = d.TargetCalories,
+                    TargetProtein = d.TargetProtein,
+                    TargetCarbs = d.TargetCarbs,
+                    TargetFat = d.TargetFat,
+                    Meals = d.Meals
+                        .OrderBy(m => m.Order)
+                        .Select(m => new DietMeal
+                        {
+                            Id = Guid.NewGuid(),
+                            MealId = m.MealId,
+                            MealTime = m.MealTime,
+                            Order = m.Order
+                        })
+                        .ToList()
+                })
+                .ToList()
+        };
     }
 
     private static DietDay ToDietDayEntity(DietDayRequest req) => new()
@@ -610,6 +719,7 @@ public static class DietPlanEndpoints
     {
         var query = db.Meals
             .Include(m => m.Foods)!.ThenInclude(f => f.Food)
+            .Include(m => m.DietMeals)
             .AsQueryable();
 
         if (role == "coach")
@@ -708,6 +818,7 @@ public static class DietPlanEndpoints
         plan.CreatedBy,
         plan.Name,
         plan.Description,
+        InferDietGoal(plan),
         plan.Days.OrderBy(d => d.DayNumber).Select(d => new DietDayDto(
             d.Id,
             d.DayNumber,
@@ -727,6 +838,16 @@ public static class DietPlanEndpoints
         plan.CreatedAt,
         plan.UpdatedAt
     );
+
+    private static string InferDietGoal(DietPlan plan)
+    {
+        if (plan.Days.Count == 0) return "general";
+
+        var averageCalories = plan.Days.Average(d => d.TargetCalories);
+        if (averageCalories <= 1900) return "fat-loss";
+        if (averageCalories >= 2500) return "muscle-gain";
+        return "maintenance";
+    }
 
     private static ClientDietPlanDto ToClientDietPlanDto(ClientDietPlan assignment) => new(
         assignment.Id,
@@ -758,5 +879,5 @@ public record MealFoodDto(Guid Id, Guid FoodId, FoodDto? Food, decimal Quantity)
 public record MealDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, List<MealFoodDto> Foods, int TotalCalories, int TotalProtein, int TotalCarbs, int TotalFat, bool IsPublished, DateTime CreatedAt);
 public record DietMealDto(Guid Id, Guid MealId, MealDto? Meal, string MealTime, int Order);
 public record DietDayDto(Guid Id, int DayNumber, List<DietMealDto> Meals, int TargetCalories, int TargetProtein, int TargetCarbs, int TargetFat);
-public record DietPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, List<DietDayDto> Days, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt);
+public record DietPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, string Goal, List<DietDayDto> Days, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt);
 public record ClientDietPlanDto(Guid Id, Guid ClientId, Guid DietPlanId, DietPlanDto? DietPlan, DateTime StartDate, DateTime? EndDate, bool IsActive);
