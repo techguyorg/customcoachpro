@@ -54,18 +54,23 @@ public static class CoachEndpoints
                 id = client.Id,
                 email = client.Email,
                 role = client.Role,
-                profile = new
-                {
-                    displayName = client.Profile?.DisplayName ?? client.Email,
-                    bio = client.Profile?.Bio,
-                    avatarUrl = client.Profile?.AvatarUrl,
-                    startDate = client.Profile?.StartDate,
-                    heightCm = client.Profile?.HeightCm,
-                    startWeight = client.Profile?.StartWeight,
-                    currentWeight = client.Profile?.CurrentWeight,
-                    targetWeight = client.Profile?.TargetWeight
-                }
-            });
+                    profile = new
+                    {
+                        displayName = client.Profile?.DisplayName ?? client.Email,
+                        bio = client.Profile?.Bio,
+                        avatarUrl = client.Profile?.AvatarUrl,
+                        preferredUnitSystem = client.Profile?.PreferredUnitSystem ?? "imperial",
+                        startDate = client.Profile?.StartDate,
+                        heightCm = client.Profile?.HeightCm,
+                        neckCm = client.Profile?.NeckCm,
+                        armsCm = client.Profile?.ArmsCm,
+                        quadsCm = client.Profile?.QuadsCm,
+                        hipsCm = client.Profile?.HipsCm,
+                        startWeight = client.Profile?.StartWeight,
+                        currentWeight = client.Profile?.CurrentWeight,
+                        targetWeight = client.Profile?.TargetWeight
+                    }
+                });
         });
 
         group.MapPost("/clients", async (ClaimsPrincipal principal, AppDbContext db, CreateClientRequest req) =>
@@ -95,8 +100,13 @@ public static class CoachEndpoints
                 {
                     UserId = Guid.Empty, // set after we know user.Id
                     DisplayName = $"{req.FirstName} {req.LastName}".Trim(),
+                    PreferredUnitSystem = string.IsNullOrWhiteSpace(req.PreferredUnitSystem) ? "imperial" : req.PreferredUnitSystem.Trim().ToLowerInvariant(),
                     StartDate = req.StartDate ?? DateTime.UtcNow.Date,
                     HeightCm = req.HeightCm,
+                    NeckCm = req.NeckCm,
+                    ArmsCm = req.ArmsCm,
+                    QuadsCm = req.QuadsCm,
+                    HipsCm = req.HipsCm,
                     StartWeight = req.StartWeight ?? req.CurrentWeight,
                     CurrentWeight = req.CurrentWeight,
                     TargetWeight = req.TargetWeight,
@@ -122,15 +132,20 @@ public static class CoachEndpoints
                 id = user.Id,
                 email = user.Email,
                 tempPassword,
-                profile = new
-                {
-                    displayName = user.Profile.DisplayName,
-                    startDate = user.Profile.StartDate,
-                    heightCm = user.Profile.HeightCm,
-                    currentWeight = user.Profile.CurrentWeight,
-                    targetWeight = user.Profile.TargetWeight
-                }
-            });
+                    profile = new
+                    {
+                        displayName = user.Profile.DisplayName,
+                        startDate = user.Profile.StartDate,
+                        preferredUnitSystem = user.Profile.PreferredUnitSystem,
+                        heightCm = user.Profile.HeightCm,
+                        neckCm = user.Profile.NeckCm,
+                        armsCm = user.Profile.ArmsCm,
+                        quadsCm = user.Profile.QuadsCm,
+                        hipsCm = user.Profile.HipsCm,
+                        currentWeight = user.Profile.CurrentWeight,
+                        targetWeight = user.Profile.TargetWeight
+                    }
+                });
         });
 
         group.MapPut("/clients/{id:guid}", async (ClaimsPrincipal principal, AppDbContext db, Guid id, UpdateClientRequest req) =>
@@ -150,10 +165,17 @@ public static class CoachEndpoints
             if (!string.IsNullOrWhiteSpace(req.DisplayName))
                 user.Profile.DisplayName = req.DisplayName.Trim();
 
+            if (!string.IsNullOrWhiteSpace(req.PreferredUnitSystem))
+                user.Profile.PreferredUnitSystem = req.PreferredUnitSystem.Trim().ToLowerInvariant();
+
             user.Profile.Bio = req.Bio ?? user.Profile.Bio;
             user.Profile.AvatarUrl = req.AvatarUrl ?? user.Profile.AvatarUrl;
             user.Profile.StartDate = req.StartDate ?? user.Profile.StartDate;
             user.Profile.HeightCm = req.HeightCm ?? user.Profile.HeightCm;
+            user.Profile.NeckCm = req.NeckCm ?? user.Profile.NeckCm;
+            user.Profile.ArmsCm = req.ArmsCm ?? user.Profile.ArmsCm;
+            user.Profile.QuadsCm = req.QuadsCm ?? user.Profile.QuadsCm;
+            user.Profile.HipsCm = req.HipsCm ?? user.Profile.HipsCm;
 
             user.Profile.StartWeight = req.StartWeight ?? user.Profile.StartWeight;
             user.Profile.CurrentWeight = req.CurrentWeight ?? user.Profile.CurrentWeight;
@@ -166,18 +188,23 @@ public static class CoachEndpoints
                 id = user.Id,
                 email = user.Email,
                 role = user.Role,
-                profile = new
-                {
-                    displayName = user.Profile.DisplayName,
-                    bio = user.Profile.Bio,
-                    avatarUrl = user.Profile.AvatarUrl,
-                    startDate = user.Profile.StartDate,
-                    heightCm = user.Profile.HeightCm,
-                    startWeight = user.Profile.StartWeight,
-                    currentWeight = user.Profile.CurrentWeight,
-                    targetWeight = user.Profile.TargetWeight
-                }
-            });
+                    profile = new
+                    {
+                        displayName = user.Profile.DisplayName,
+                        bio = user.Profile.Bio,
+                        avatarUrl = user.Profile.AvatarUrl,
+                        preferredUnitSystem = user.Profile.PreferredUnitSystem,
+                        startDate = user.Profile.StartDate,
+                        heightCm = user.Profile.HeightCm,
+                        neckCm = user.Profile.NeckCm,
+                        armsCm = user.Profile.ArmsCm,
+                        quadsCm = user.Profile.QuadsCm,
+                        hipsCm = user.Profile.HipsCm,
+                        startWeight = user.Profile.StartWeight,
+                        currentWeight = user.Profile.CurrentWeight,
+                        targetWeight = user.Profile.TargetWeight
+                    }
+                });
         });
     }
 
@@ -197,9 +224,14 @@ public static class CoachEndpoints
         string? Goals,
         DateTime? StartDate,
         decimal? HeightCm,
+        decimal? NeckCm,
+        decimal? ArmsCm,
+        decimal? QuadsCm,
+        decimal? HipsCm,
         decimal? StartWeight,
         decimal? CurrentWeight,
         decimal? TargetWeight,
+        string? PreferredUnitSystem,
         string? Notes
     );
 
@@ -209,8 +241,13 @@ public static class CoachEndpoints
         string? AvatarUrl,
         DateTime? StartDate,
         decimal? HeightCm,
+        decimal? NeckCm,
+        decimal? ArmsCm,
+        decimal? QuadsCm,
+        decimal? HipsCm,
         decimal? StartWeight,
         decimal? CurrentWeight,
-        decimal? TargetWeight
+        decimal? TargetWeight,
+        string? PreferredUnitSystem
     );
 }
