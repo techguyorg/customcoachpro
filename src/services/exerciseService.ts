@@ -89,7 +89,7 @@ const exerciseService = {
 
     const total = paginated.total ?? list.length;
     const page = paginated.page ?? filters?.page ?? 1;
-    const pageSize = paginated.pageSize ?? filters?.pageSize ?? list.length || 10;
+    const pageSize = paginated.pageSize ?? filters?.pageSize ?? (list.length || 10);
     const totalPages = paginated.totalPages ?? Math.max(1, Math.ceil(total / pageSize));
 
     return {
