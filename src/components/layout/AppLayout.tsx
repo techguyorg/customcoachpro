@@ -107,14 +107,18 @@ export function AppLayout() {
                   )
                 }
               >
-                <item.icon
-                  className={cn(
-                    "h-4 w-4",
-                    iconTokens[item.tone].icon,
-                    isActive && "text-primary-foreground"
-                  )}
-                />
-                {item.label}
+                {({ isActive }) => (
+                  <>
+                    <item.icon
+                      className={cn(
+                        "h-4 w-4",
+                        iconTokens[item.tone].icon,
+                        isActive && "text-primary-foreground"
+                      )}
+                    />
+                    {item.label}
+                  </>
+                )}
               </NavLink>
             ))}
           </nav>
@@ -213,14 +217,18 @@ export function AppLayout() {
                     )
                   }
                 >
-                  <item.icon
-                    className={cn(
-                      "h-5 w-5",
-                      iconTokens[item.tone].icon,
-                      isActive && "text-primary-foreground"
-                    )}
-                  />
-                  {item.label}
+                  {({ isActive }) => (
+                    <>
+                      <item.icon
+                        className={cn(
+                          "h-5 w-5",
+                          iconTokens[item.tone].icon,
+                          isActive && "text-primary-foreground"
+                        )}
+                      />
+                      {item.label}
+                    </>
+                  )}
                 </NavLink>
               ))}
             </div>
