@@ -13,6 +13,8 @@ public static class CheckInEndpoints
     {
         var group = app.MapGroup("/api/checkins").RequireAuthorization();
 
+        group.MapGet("/", (ClaimsPrincipal principal, AppDbContext db, string? status, string? type, Guid? coachId) =>
+            GetCheckIns(principal, db, status, type, coachId));
         group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db) =>
         {
             var (userId, role) = GetUser(principal);
@@ -29,8 +31,8 @@ public static class CheckInEndpoints
                     (c, u) => ToDto(c, u))
                 .ToListAsync();
 
-            return Results.Ok(results);
-        });
+        group.MapGet("/pending", (ClaimsPrincipal principal, AppDbContext db, string? type, Guid? coachId) =>
+            GetCheckIns(principal, db, CheckInStatus.Pending, type, coachId));
 
         group.MapGet("/{id:guid}", async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
         {
@@ -228,6 +230,50 @@ public static class CheckInEndpoints
         }
 
         return query;
+    }
+
+    private static async Task<IResult> GetCheckIns(
+        ClaimsPrincipal principal,
+        AppDbContext db,
+        string? status,
+        string? type,
+        Guid? coachId)
+    {
+        var (userId, role) = GetUser(principal);
+        if (userId is null) return Results.Unauthorized();
+
+        var scoped = ApplyScope(db, userId.Value, role);
+
+        if (coachId.HasValue)
+            scoped = scoped.Where(c => c.CoachId == coachId.Value);
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            var normalized = status.Trim().ToLowerInvariant();
+            if (normalized is not (CheckInStatus.Pending or CheckInStatus.Reviewed))
+                return Results.BadRequest(new { message = "Invalid status" });
+
+            scoped = scoped.Where(c => c.Status == normalized);
+        }
+
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            var normalizedType = type.Trim().ToLowerInvariant();
+            if (!CheckInType.All.Contains(normalizedType))
+                return Results.BadRequest(new { message = "Invalid check-in type" });
+
+            scoped = scoped.Where(c => c.Type == normalizedType);
+        }
+
+        var results = await scoped
+            .OrderByDescending(c => c.SubmittedAt)
+            .Join(db.Users.Include(u => u.Profile),
+                c => c.ClientId,
+                u => u.Id,
+                (c, u) => ToDto(c, u))
+            .ToListAsync();
+
+        return Results.Ok(results);
     }
 
     private static void ApplyRequest(CheckIn checkIn, UpsertCheckInRequest req)

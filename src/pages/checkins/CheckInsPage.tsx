@@ -15,16 +15,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import checkInService, { CheckIn } from '@/services/checkInService';
+import checkInService, { CheckIn, CheckInStatus, CheckInType } from '@/services/checkInService';
 
-const typeIcons = {
+const typeIcons: Record<CheckInType, typeof Scale> = {
   weight: Scale,
   photos: Camera,
   workout: Dumbbell,
   diet: Utensils,
 };
 
-const typeLabels = {
+const typeLabels: Record<CheckInType, string> = {
   weight: 'Weight & Measurements',
   photos: 'Progress Photos',
   workout: 'Workout Completion',
@@ -32,18 +32,28 @@ const typeLabels = {
 };
 
 export function CheckInsPage() {
+  const [activeTab, setActiveTab] = useState<CheckInStatus>('pending');
   const [selectedCheckInId, setSelectedCheckInId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  const {
-    data: checkIns = [],
-    isLoading,
-    isError,
-    error,
-  } = useQuery({
-    queryKey: ['check-ins'],
-    queryFn: () => checkInService.getCheckIns(),
+  const pendingQuery = useQuery({
+    queryKey: ['check-ins', 'pending'],
+    queryFn: () => checkInService.getCheckIns({ status: 'pending' }),
   });
+
+  const reviewedQuery = useQuery({
+    queryKey: ['check-ins', 'reviewed'],
+    queryFn: () => checkInService.getCheckIns({ status: 'reviewed' }),
+  });
+
+  const activeQuery = activeTab === 'pending' ? pendingQuery : reviewedQuery;
+
+  const pendingCheckIns = pendingQuery.data ?? [];
+  const reviewedCheckIns = reviewedQuery.data ?? [];
+  const allCheckIns = useMemo(
+    () => [...(pendingQuery.data ?? []), ...(reviewedQuery.data ?? [])],
+    [pendingQuery.data, reviewedQuery.data],
+  );
 
   const reviewMutation = useMutation({
     mutationFn: (id: string) => checkInService.markReviewed(id),
@@ -54,12 +64,9 @@ export function CheckInsPage() {
   });
 
   const selectedCheckIn = useMemo(
-    () => checkIns.find((c) => c.id === selectedCheckInId) ?? null,
-    [checkIns, selectedCheckInId],
+    () => allCheckIns.find((c) => c.id === selectedCheckInId) ?? null,
+    [allCheckIns, selectedCheckInId],
   );
-
-  const pendingCheckIns = checkIns.filter((c) => c.status === 'pending');
-  const reviewedCheckIns = checkIns.filter((c) => c.status === 'reviewed');
 
   const CheckInCard = ({ checkIn }: { checkIn: CheckIn }) => {
     const Icon = typeIcons[checkIn.type];
@@ -180,30 +187,32 @@ export function CheckInsPage() {
           </div>
         );
       case 'photos':
-        const photos = selectedCheckIn.data.photos ?? {};
-        return (
-          <div className="grid grid-cols-3 gap-4">
-            {(['front', 'side', 'back'] as const).map((angle) => (
-              <div
-                key={angle}
-                className="aspect-[3/4] rounded-lg bg-muted flex items-center justify-center overflow-hidden"
-              >
-                {photos[angle] ? (
-                  <img
-                    src={photos[angle] ?? undefined}
-                    alt={`${angle} progress`}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                    <Camera className="h-8 w-8" />
-                    <span className="text-xs capitalize">{angle}</span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        );
+        {
+          const photos = selectedCheckIn.data.photos ?? {};
+          return (
+            <div className="grid grid-cols-3 gap-4">
+              {(['front', 'side', 'back'] as const).map((angle) => (
+                <div
+                  key={angle}
+                  className="aspect-[3/4] rounded-lg bg-muted flex items-center justify-center overflow-hidden"
+                >
+                  {photos[angle] ? (
+                    <img
+                      src={photos[angle] ?? undefined}
+                      alt={`${angle} progress`}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Camera className="h-8 w-8" />
+                      <span className="text-xs capitalize">{angle}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        }
       default:
         return null;
     }
@@ -223,18 +232,28 @@ export function CheckInsPage() {
         }
       />
 
-      {isError && (
+      {activeQuery.isError && (
         <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-destructive">
-          {error instanceof Error ? error.message : 'Unable to load check-ins right now.'}
+          {activeQuery.error instanceof Error
+            ? activeQuery.error.message
+            : 'Unable to load check-ins right now.'}
           <div className="mt-3">
-            <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ['check-ins'] })}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => activeQuery.refetch()}
+            >
               Retry
             </Button>
           </div>
         </div>
       )}
 
-      <Tabs defaultValue="pending" className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(value) => setActiveTab(value as CheckInStatus)}
+        className="space-y-4"
+      >
         <TabsList>
           <TabsTrigger value="pending" className="flex items-center gap-2">
             <ClipboardCheck className="h-4 w-4" />
@@ -247,7 +266,7 @@ export function CheckInsPage() {
         </TabsList>
 
         <TabsContent value="pending">
-          {isLoading ? (
+          {pendingQuery.isLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, idx) => (
                 <Card key={idx}>
@@ -281,7 +300,7 @@ export function CheckInsPage() {
         </TabsContent>
 
         <TabsContent value="reviewed">
-          {isLoading ? (
+          {reviewedQuery.isLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 3 }).map((_, idx) => (
                 <Card key={idx}>
