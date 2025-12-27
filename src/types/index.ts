@@ -86,10 +86,12 @@ export interface Exercise {
   coachId: string;
   name: string;
   description?: string;
-  muscleGroup: string;
-  equipmentRequired?: string;
+  muscleGroups: string[];
+  tags: string[];
+  equipment?: string;
   videoUrl?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface WorkoutExercise {

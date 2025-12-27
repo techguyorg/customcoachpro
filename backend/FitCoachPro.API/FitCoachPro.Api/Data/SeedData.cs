@@ -103,6 +103,60 @@ public static class SeedData
         );
 
         var now = DateTime.UtcNow;
+        var exercises = new[]
+        {
+            new Exercise
+            {
+                Id = Guid.NewGuid(),
+                CoachId = coachId,
+                Name = "Bench Press",
+                Description = "Compound chest press with barbell",
+                MuscleGroups = "Chest,Triceps,Shoulders",
+                Tags = "barbell,strength,push",
+                Equipment = "Barbell",
+                CreatedAt = now.AddDays(-30),
+                UpdatedAt = now.AddDays(-20),
+            },
+            new Exercise
+            {
+                Id = Guid.NewGuid(),
+                CoachId = coachId,
+                Name = "Deadlift",
+                Description = "Conventional deadlift from the floor",
+                MuscleGroups = "Back,Glutes,Hamstrings",
+                Tags = "barbell,strength,pull",
+                Equipment = "Barbell",
+                CreatedAt = now.AddDays(-28),
+                UpdatedAt = now.AddDays(-25),
+            },
+            new Exercise
+            {
+                Id = Guid.NewGuid(),
+                CoachId = coachId,
+                Name = "Back Squat",
+                Description = "High-bar back squat",
+                MuscleGroups = "Quads,Glutes,Core",
+                Tags = "barbell,strength,legs",
+                Equipment = "Barbell",
+                CreatedAt = now.AddDays(-26),
+                UpdatedAt = now.AddDays(-22),
+            },
+            new Exercise
+            {
+                Id = Guid.NewGuid(),
+                CoachId = coachId,
+                Name = "Lat Pulldown",
+                Description = "Vertical pull for lats",
+                MuscleGroups = "Back,Biceps",
+                Tags = "cable,hypertrophy,pull",
+                Equipment = "Pulldown machine",
+                CreatedAt = now.AddDays(-24),
+                UpdatedAt = now.AddDays(-21),
+            },
+        };
+
+        db.Exercises.AddRange(exercises);
+
         var strengthPlanId = Guid.NewGuid();
         var strengthPlan = new WorkoutPlan
         {
@@ -125,7 +179,8 @@ public static class SeedData
                         new WorkoutExercise
                         {
                             Id = Guid.NewGuid(),
-                            ExerciseName = "Bench Press",
+                            ExerciseId = exercises[0].Id,
+                            ExerciseName = exercises[0].Name,
                             Sets = 3,
                             Reps = "8-10",
                             RestSeconds = 120,
@@ -152,7 +207,8 @@ public static class SeedData
                         new WorkoutExercise
                         {
                             Id = Guid.NewGuid(),
-                            ExerciseName = "Deadlift",
+                            ExerciseId = exercises[1].Id,
+                            ExerciseName = exercises[1].Name,
                             Sets = 3,
                             Reps = "5",
                             RestSeconds = 180,
@@ -179,7 +235,8 @@ public static class SeedData
                         new WorkoutExercise
                         {
                             Id = Guid.NewGuid(),
-                            ExerciseName = "Back Squat",
+                            ExerciseId = exercises[2].Id,
+                            ExerciseName = exercises[2].Name,
                             Sets = 4,
                             Reps = "6-8",
                             RestSeconds = 180,
