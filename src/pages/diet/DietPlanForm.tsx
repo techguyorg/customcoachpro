@@ -6,13 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import type { DietPlan, Meal } from "@/types";
-import type { DietPlanPayload } from "@/services/dietPlanService";
-
-export type DietPlanTemplate = {
-  name: string;
-  description: string;
-  payload: DietPlanPayload;
-};
+import type { DietPlanPayload, DietPlanTemplate } from "@/services/dietPlanService";
 
 type DietMealForm = {
   id: string;

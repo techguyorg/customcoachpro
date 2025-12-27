@@ -50,6 +50,12 @@ export const API_ENDPOINTS = {
     review: (id: string) => `/checkins/${id}/review`,
   },
 
+  notifications: {
+    base: "/notifications",
+    markRead: (id: string) => `/notifications/${id}/read`,
+    markAllRead: "/notifications/read-all",
+  },
+
   // Exercises
   exercises: {
     base: "/exercises",
@@ -63,6 +69,7 @@ export const API_ENDPOINTS = {
     byId: (id: string) => `/workout-plans/${id}`,
     byCoach: (coachId: string) => `/workout-plans/coach/${coachId}`,
     assign: "/workout-plans/assign",
+    duplicate: (id: string) => `/workout-plans/${id}/duplicate`,
     clientPlans: (clientId: string) => `/workout-plans/client/${clientId}`,
   },
 
@@ -85,6 +92,7 @@ export const API_ENDPOINTS = {
     base: "/diet-plans",
     byId: (id: string) => `/diet-plans/${id}`,
     byCoach: (coachId: string) => `/diet-plans/coach/${coachId}`,
+    templates: "/diet-plans/templates",
     assign: "/diet-plans/assign",
     clientPlans: (clientId: string) => `/diet-plans/client/${clientId}`,
   },

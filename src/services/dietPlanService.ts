@@ -33,9 +33,20 @@ export type AssignDietPlanPayload = {
   startDate: string;
 };
 
+export type DietPlanTemplate = {
+  name: string;
+  description: string;
+  payload: DietPlanPayload;
+};
+
 const dietPlanService = {
   async list(): Promise<DietPlan[]> {
     const response = await apiService.get<ApiResponse<DietPlan[]>>(API_ENDPOINTS.dietPlans.base);
+    return response.data;
+  },
+
+  async templates(): Promise<DietPlanTemplate[]> {
+    const response = await apiService.get<ApiResponse<DietPlanTemplate[]>>(API_ENDPOINTS.dietPlans.templates);
     return response.data;
   },
 
