@@ -27,6 +27,7 @@ import {
   Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
 type NavItem = {
   to: string;
@@ -126,6 +127,8 @@ export function AppLayout() {
                 {viewMode === "client" ? "View as Coach" : "View as Client"}
               </Button>
             )}
+
+            <NotificationsBell />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

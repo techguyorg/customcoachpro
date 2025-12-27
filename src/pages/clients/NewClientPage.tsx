@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import coachService from "@/services/coachService";
 
+type UnitSystem = "imperial" | "metric";
+
 const clientSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   lastName: z.string().min(2, "Last name must be at least 2 characters"),
@@ -19,29 +21,69 @@ const clientSchema = z.object({
   goals: z.string().optional(),
   currentWeight: z.number().positive("Weight must be positive").optional(),
   targetWeight: z.number().positive("Weight must be positive").optional(),
-  height: z.number().positive("Height must be positive").optional(), // inches in UI
+  startWeight: z.number().positive("Weight must be positive").optional(),
+  height: z.number().positive("Height must be positive").optional(), // inches/cm in UI
+  neck: z.number().positive("Neck must be positive").optional(),
+  arms: z.number().positive("Arms must be positive").optional(),
+  quads: z.number().positive("Quads must be positive").optional(),
+  hips: z.number().positive("Hips must be positive").optional(),
   notes: z.string().optional(),
 });
 
 type ClientFormData = z.infer<typeof clientSchema>;
 
-function inchesToCm(inches?: number) {
-  if (!inches || Number.isNaN(inches)) return undefined;
-  return Math.round(inches * 2.54 * 10) / 10; // 1 decimal
-}
+const INCH_TO_CM = 2.54;
+const LB_TO_KG = 0.45359237;
+
+const convertLength = (value: number | undefined, from: UnitSystem, to: UnitSystem) => {
+  if (value === undefined || Number.isNaN(value)) return undefined;
+  if (from === to) return value;
+  return from === "imperial" ? Number((value * INCH_TO_CM).toFixed(1)) : Number((value / INCH_TO_CM).toFixed(1));
+};
+
+const convertWeight = (value: number | undefined, from: UnitSystem, to: UnitSystem) => {
+  if (value === undefined || Number.isNaN(value)) return undefined;
+  if (from === to) return value;
+  return from === "imperial" ? Number((value * LB_TO_KG).toFixed(1)) : Number((value / LB_TO_KG).toFixed(1));
+};
 
 export function NewClientPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>("imperial");
 
   const {
     register,
     handleSubmit,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
   });
+
+  const weightLabel = useMemo(() => (unitSystem === "imperial" ? "lbs" : "kg"), [unitSystem]);
+  const lengthLabel = useMemo(() => (unitSystem === "imperial" ? "inches" : "cm"), [unitSystem]);
+
+  const handleUnitToggle = (next: UnitSystem) => {
+    if (next === unitSystem) return;
+    const currentValues = getValues();
+
+    // Convert weights
+    setValue("startWeight", convertWeight(currentValues.startWeight, unitSystem, next));
+    setValue("currentWeight", convertWeight(currentValues.currentWeight, unitSystem, next));
+    setValue("targetWeight", convertWeight(currentValues.targetWeight, unitSystem, next));
+
+    // Convert lengths
+    setValue("height", convertLength(currentValues.height, unitSystem, next));
+    setValue("neck", convertLength(currentValues.neck, unitSystem, next));
+    setValue("arms", convertLength(currentValues.arms, unitSystem, next));
+    setValue("quads", convertLength(currentValues.quads, unitSystem, next));
+    setValue("hips", convertLength(currentValues.hips, unitSystem, next));
+
+    setUnitSystem(next);
+  };
 
   const onSubmit = async (data: ClientFormData) => {
     try {
@@ -54,8 +96,13 @@ export function NewClientPage() {
         goals: data.goals,
         notes: data.notes,
         startDate: new Date().toISOString(),
-        heightCm: inchesToCm(data.height),
-        startWeight: data.currentWeight,
+        preferredUnitSystem: unitSystem,
+        heightCm: convertLength(data.height, unitSystem, "metric"),
+        neckCm: convertLength(data.neck, unitSystem, "metric"),
+        armsCm: convertLength(data.arms, unitSystem, "metric"),
+        quadsCm: convertLength(data.quads, unitSystem, "metric"),
+        hipsCm: convertLength(data.hips, unitSystem, "metric"),
+        startWeight: data.startWeight ?? data.currentWeight,
         currentWeight: data.currentWeight,
         targetWeight: data.targetWeight,
       });
@@ -123,18 +170,47 @@ export function NewClientPage() {
             <CardDescription>Current measurements and goals</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Button type="button" variant={unitSystem === "imperial" ? "default" : "outline"} onClick={() => handleUnitToggle("imperial")}>
+                Imperial (lbs/in)
+              </Button>
+              <Button type="button" variant={unitSystem === "metric" ? "default" : "outline"} onClick={() => handleUnitToggle("metric")}>
+                Metric (kg/cm)
+              </Button>
+            </div>
+
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="currentWeight">Current Weight (lbs)</Label>
-                <Input id="currentWeight" type="number" placeholder="185" {...register("currentWeight", { valueAsNumber: true })} />
+                <Label htmlFor="startWeight">Start Weight ({weightLabel})</Label>
+                <Input id="startWeight" type="number" placeholder={unitSystem === "imperial" ? "185" : "84"} {...register("startWeight", { valueAsNumber: true })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="targetWeight">Target Weight (lbs)</Label>
-                <Input id="targetWeight" type="number" placeholder="165" {...register("targetWeight", { valueAsNumber: true })} />
+                <Label htmlFor="currentWeight">Current Weight ({weightLabel})</Label>
+                <Input id="currentWeight" type="number" placeholder={unitSystem === "imperial" ? "185" : "84"} {...register("currentWeight", { valueAsNumber: true })} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="height">Height (inches)</Label>
-                <Input id="height" type="number" placeholder="70" {...register("height", { valueAsNumber: true })} />
+                <Label htmlFor="targetWeight">Target Weight ({weightLabel})</Label>
+                <Input id="targetWeight" type="number" placeholder={unitSystem === "imperial" ? "165" : "75"} {...register("targetWeight", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="height">Height ({lengthLabel})</Label>
+                <Input id="height" type="number" placeholder={unitSystem === "imperial" ? "70" : "178"} {...register("height", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="neck">Neck ({lengthLabel})</Label>
+                <Input id="neck" type="number" placeholder={unitSystem === "imperial" ? "15" : "38"} {...register("neck", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="arms">Arms ({lengthLabel})</Label>
+                <Input id="arms" type="number" placeholder={unitSystem === "imperial" ? "14" : "36"} {...register("arms", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quads">Quads ({lengthLabel})</Label>
+                <Input id="quads" type="number" placeholder={unitSystem === "imperial" ? "22" : "56"} {...register("quads", { valueAsNumber: true })} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="hips">Hips ({lengthLabel})</Label>
+                <Input id="hips" type="number" placeholder={unitSystem === "imperial" ? "36" : "91"} {...register("hips", { valueAsNumber: true })} />
               </div>
             </div>
           </CardContent>

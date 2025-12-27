@@ -57,7 +57,22 @@ For photo uploads, configure Azure Blob Storage:
 }
 ```
 
-### 4. Run Database Migrations
+### 4. Configure Email Notifications (Optional)
+
+Add Azure Communication Services Email credentials to `appsettings.json` to enable outbound emails for notifications:
+
+```json
+{
+  "AzureEmail": {
+    "ConnectionString": "endpoint=https://<resource-name>.communication.azure.com/;accesskey=<key>",
+    "SenderAddress": "DoNotReply@<resource-name>.azurecomm.net"
+  }
+}
+```
+
+Without these values, notifications will still be stored and visible in-app but will not send email copies.
+
+### 5. Run Database Migrations
 
 ```bash
 cd FitCoachPro.API
@@ -65,7 +80,7 @@ dotnet ef migrations add InitialCreate
 dotnet ef database update
 ```
 
-### 5. Run the API
+### 6. Run the API
 
 ```bash
 dotnet run

@@ -6,6 +6,9 @@ export type CoachDashboardStats = {
   pendingCheckIns: number;
   workoutPlansCreated: number;
   dietPlansCreated: number;
+  attentionItems: AttentionItem[];
+  upcomingRenewals: UpcomingRenewal[];
+  complianceTrend: ComplianceTrend;
 };
 
 export type ClientDashboardStats = {
@@ -14,6 +17,30 @@ export type ClientDashboardStats = {
   workoutsCompleted: number;
   dietComplianceAverage: number;
   daysOnPlan: number;
+};
+
+export type AttentionItem = {
+  clientId: string;
+  clientName: string;
+  type: string;
+  summary: string;
+  submittedAt?: string;
+};
+
+export type UpcomingRenewal = {
+  clientId: string;
+  clientName: string;
+  planId: string;
+  planName: string;
+  planType: "workout" | "diet";
+  renewalDate: string;
+  daysRemaining: number;
+};
+
+export type ComplianceTrend = {
+  average: number;
+  change: number;
+  sampleSize: number;
 };
 
 const dashboardService = {

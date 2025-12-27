@@ -26,6 +26,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var foods = await GetScopedFoods(db, userId.Value, role)
                 .OrderBy(f => f.Name)
@@ -38,6 +39,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var food = await GetScopedFoods(db, userId.Value, role)
                 .FirstOrDefaultAsync(f => f.Id == id);
@@ -128,6 +130,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var meals = await GetScopedMeals(db, userId.Value, role)
                 .OrderBy(m => m.Name)
@@ -140,6 +143,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var meal = await GetScopedMeals(db, userId.Value, role)
                 .FirstOrDefaultAsync(m => m.Id == id);
@@ -264,6 +268,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var plans = await GetScopedPlans(db, userId.Value, role)
                 .ToListAsync();
@@ -275,6 +280,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var plan = await GetScopedPlans(db, userId.Value, role)
                 .FirstOrDefaultAsync(p => p.Id == id);
@@ -297,12 +303,29 @@ public static class DietPlanEndpoints
             return Results.Ok(new { data = plans.Select(ToDietPlanDto), success = true });
         });
 
+        group.MapGet("/templates", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db) =>
+        {
+            var (coachId, role) = GetUser(principal);
+            if (coachId is null || role != "coach") return Results.Forbid();
+
+            var meals = await db.Meals
+                .Include(m => m.Foods)!.ThenInclude(f => f.Food)
+                .Where(m => m.CoachId == coachId)
+                .OrderBy(m => m.Name)
+                .ToListAsync();
+
+            var templates = BuildDietTemplates(meals);
+
+            return Results.Ok(new { data = templates, success = true });
+        });
+
         group.MapGet("/client/{clientId:guid}", async (ClaimsPrincipal principal, AppDbContext db, Guid clientId) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
 
             if (role == "client" && userId != clientId) return Results.Forbid();
+            if (role is not ("coach" or "client")) return Results.Forbid();
             if (role == "coach")
             {
                 var mapped = await db.CoachClients.AnyAsync(cc => cc.CoachId == userId && cc.ClientId == clientId && cc.IsActive);
@@ -347,6 +370,16 @@ public static class DietPlanEndpoints
                     .ToList()
             };
 
+            db.AuditLogs.Add(new AuditLog
+            {
+                CoachId = coachId.Value,
+                ActorId = coachId.Value,
+                EntityId = plan.Id,
+                EntityType = "diet-plan",
+                Action = "created",
+                Details = $"Created diet plan '{plan.Name}'"
+            });
+
             db.DietPlans.Add(plan);
             await db.SaveChangesAsync();
 
@@ -387,6 +420,16 @@ public static class DietPlanEndpoints
             }
 
             plan.UpdatedAt = DateTime.UtcNow;
+            db.AuditLogs.Add(new AuditLog
+            {
+                CoachId = coachId.Value,
+                ActorId = coachId.Value,
+                EntityId = plan.Id,
+                EntityType = "diet-plan",
+                Action = "updated",
+                Details = $"Updated diet plan '{plan.Name}'"
+            });
+
             await db.SaveChangesAsync();
 
             var hydrated = await GetScopedPlans(db, coachId.Value, role)
@@ -469,6 +512,65 @@ public static class DietPlanEndpoints
             })
             .ToList()
     };
+
+    private static List<DietPlanTemplateDto> BuildDietTemplates(List<Meal> meals)
+    {
+        var threeMealSchedule = BuildMealSchedule(meals, new[] { "Breakfast", "Lunch", "Dinner" });
+        var fourMealSchedule = BuildMealSchedule(meals, new[] { "Breakfast", "Lunch", "Snack", "Dinner" });
+
+        return
+        [
+            new DietPlanTemplateDto(
+                "Lean loss rotation",
+                "Lower carb weekdays with steady protein.",
+                new CreateDietPlanRequest(
+                    "Lean loss rotation",
+                    "Lower carb weekdays with steady protein.",
+                    [
+                        new DietDayRequest(1, 1800, 160, 150, 60, threeMealSchedule),
+                        new DietDayRequest(2, 1900, 160, 180, 65, threeMealSchedule)
+                    ]
+                )
+            ),
+            new DietPlanTemplateDto(
+                "Muscle gain push",
+                "Higher calories and carbs for training days.",
+                new CreateDietPlanRequest(
+                    "Muscle gain push",
+                    "Higher calories and carbs for training days.",
+                    [
+                        new DietDayRequest(1, 2800, 190, 320, 85, fourMealSchedule),
+                        new DietDayRequest(2, 2600, 185, 260, 80, fourMealSchedule)
+                    ]
+                )
+            ),
+            new DietPlanTemplateDto(
+                "Balanced maintenance",
+                "Simple daily template for habit building.",
+                new CreateDietPlanRequest(
+                    "Balanced maintenance",
+                    "Simple daily template for habit building.",
+                    [
+                        new DietDayRequest(1, 2200, 160, 240, 70, threeMealSchedule)
+                    ]
+                )
+            )
+        ];
+    }
+
+    private static List<DietMealRequest> BuildMealSchedule(List<Meal> meals, IReadOnlyList<string> labels)
+    {
+        if (meals.Count == 0) return new List<DietMealRequest>();
+
+        var schedule = new List<DietMealRequest>();
+        for (var i = 0; i < labels.Count; i++)
+        {
+            var meal = meals[i % meals.Count];
+            schedule.Add(new DietMealRequest(meal.Id, labels[i], i + 1));
+        }
+
+        return schedule;
+    }
 
     private static IQueryable<Food> GetScopedFoods(AppDbContext db, Guid userId, string role)
     {
@@ -631,6 +733,7 @@ public record DietDayRequest(int DayNumber, int TargetCalories, int TargetProtei
 public record CreateDietPlanRequest(string Name, string? Description, List<DietDayRequest> Days);
 public record UpdateDietPlanRequest(string? Name, string? Description, List<DietDayRequest>? Days);
 public record AssignDietPlanRequest(Guid ClientId, Guid DietPlanId, DateTime StartDate);
+public record DietPlanTemplateDto(string Name, string Description, CreateDietPlanRequest Payload);
 
 public record FoodDto(Guid Id, Guid CoachId, string Name, int Calories, int Protein, int Carbs, int Fat, string ServingSize, DateTime CreatedAt);
 public record MealFoodDto(Guid Id, Guid FoodId, FoodDto? Food, decimal Quantity);

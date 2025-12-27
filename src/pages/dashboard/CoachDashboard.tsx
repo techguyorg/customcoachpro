@@ -1,9 +1,22 @@
-import { Users, ClipboardCheck, Dumbbell, Utensils, TrendingUp, Plus } from "lucide-react";
+import {
+  Users,
+  ClipboardCheck,
+  Dumbbell,
+  Utensils,
+  TrendingUp,
+  Plus,
+  AlertTriangle,
+  CalendarClock,
+  LineChart,
+  ArrowUpRight,
+  ArrowDownRight,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { StatCard } from "@/components/shared/StatCard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +24,7 @@ import { useQuery } from "@tanstack/react-query";
 import dashboardService from "@/services/dashboardService";
 import coachService from "@/services/coachService";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatDistanceToNow } from "date-fns";
 
 export function CoachDashboard() {
   const { user } = useAuth();
@@ -50,18 +64,23 @@ export function CoachDashboard() {
   };
 
   // Keep demo widgets but use real client list as "recent"
-  const recentClients = (clients ?? []).slice(0, 4).map((c, idx) => ({
+  const recentClients = (clients ?? []).slice(0, 4).map((c) => ({
     id: c.id,
     displayName: c.displayName,
     avatarUrl: "",
     lastCheckIn: "—",
-    status: idx % 3 === 0 ? "needs-attention" : "on-track",
+    status: c.attentionReason ? "needs-attention" : "on-track",
+    attentionReason: c.attentionReason,
   }));
 
   const pendingCheckIns = [
     { id: "1", clientName: "—", type: "Weight", date: "—" },
     { id: "2", clientName: "—", type: "Workout", date: "—" },
   ];
+
+  const attentionItems = stats?.attentionItems ?? [];
+  const upcomingRenewals = stats?.upcomingRenewals ?? [];
+  const complianceTrend = stats?.complianceTrend;
 
   const statCards = [
     {
@@ -98,6 +117,16 @@ export function CoachDashboard() {
     },
   ];
 
+  const formatDate = (value?: string) => {
+    if (!value) return "—";
+    return new Date(value).toLocaleDateString();
+  };
+
+  const formatRelativeTime = (value?: string) => {
+    if (!value) return "—";
+    return formatDistanceToNow(new Date(value), { addSuffix: true });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <PageHeader
@@ -132,7 +161,7 @@ export function CoachDashboard() {
         <p className="text-sm text-destructive">Unable to load dashboard stats right now.</p>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -180,7 +209,16 @@ export function CoachDashboard() {
                         <p className="text-sm text-muted-foreground">Last check-in: {client.lastCheckIn}</p>
                       </div>
                     </div>
-                    {getStatusBadge(client.status)}
+                    {client.attentionReason ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>{getStatusBadge(client.status)}</TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-sm">{client.attentionReason}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      getStatusBadge(client.status)
+                    )}
                   </div>
                 ))
               )}
@@ -218,6 +256,145 @@ export function CoachDashboard() {
                 </div>
               ))}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="xl:col-span-1">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Insights</CardTitle>
+              <CardDescription>High-priority items and renewals</CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {statsLoading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-lg" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-2/3" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : statsError ? (
+              <p className="text-sm text-destructive">Unable to load insights right now.</p>
+            ) : (
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-energy" />
+                      <p className="text-sm font-semibold text-foreground">Needs attention</p>
+                    </div>
+                    <Badge variant="outline">{attentionItems.length}</Badge>
+                  </div>
+                  {attentionItems.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No urgent client items.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {attentionItems.map((item) => (
+                        <div
+                          key={`${item.clientId}-${item.submittedAt}-${item.type}`}
+                          className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() => navigate(`/clients/${item.clientId}`)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-energy/10 flex items-center justify-center">
+                              <ClipboardCheck className="h-5 w-5 text-energy" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">{item.clientName}</p>
+                              <p className="text-sm text-muted-foreground">{item.summary}</p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {formatRelativeTime(item.submittedAt)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <CalendarClock className="h-4 w-4 text-primary" />
+                    <p className="text-sm font-semibold text-foreground">Upcoming renewals</p>
+                  </div>
+                  {upcomingRenewals.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No renewals in the next few weeks.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {upcomingRenewals.map((item) => (
+                        <div
+                          key={`${item.planType}-${item.planId}-${item.renewalDate}`}
+                          className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                          onClick={() =>
+                            navigate(
+                              item.planType === "workout"
+                                ? `/workout-plans/${item.planId}/edit`
+                                : `/diet-plans/${item.planId}/edit`,
+                            )
+                          }
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                              <LineChart className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground">
+                                {item.planName} · {item.clientName}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                Renews {formatDate(item.renewalDate)} • {item.planType === "workout" ? "Workout" : "Nutrition"}
+                              </p>
+                            </div>
+                          </div>
+                          <Badge variant="outline">{item.daysRemaining}d</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-accent" />
+                    <p className="text-sm font-semibold text-foreground">Compliance trend</p>
+                  </div>
+                  {complianceTrend ? (
+                    <div className="flex items-center justify-between rounded-lg border p-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Average diet compliance</p>
+                        <p className="text-2xl font-semibold text-foreground">
+                          {Math.round(complianceTrend.average)}%
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Based on {complianceTrend.sampleSize} recent check-ins
+                        </p>
+                      </div>
+                      <div
+                        className={`flex items-center gap-1 text-sm font-medium ${
+                          complianceTrend.change >= 0 ? "text-green-600" : "text-destructive"
+                        }`}
+                      >
+                        {complianceTrend.change >= 0 ? (
+                          <ArrowUpRight className="h-4 w-4" />
+                        ) : (
+                          <ArrowDownRight className="h-4 w-4" />
+                        )}
+                        {Math.abs(complianceTrend.change)}%
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No compliance data yet.</p>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -16,6 +16,7 @@ type ClientRow = {
   startDate?: string;
   currentWeight?: number;
   targetWeight?: number;
+  attentionReason?: string | null;
 };
 
 export function ClientsPage() {
@@ -70,7 +71,16 @@ export function ClientsPage() {
     {
       key: "status",
       header: "Status",
-      cell: () => <Badge className="bg-vitality/20 text-vitality border-0">Active</Badge>,
+      cell: (client) => (
+        <div className="flex items-center gap-2">
+          <Badge className="bg-vitality/20 text-vitality border-0">Active</Badge>
+          {client.attentionReason && (
+            <Badge variant="secondary" className="bg-energy/20 text-energy border-0">
+              {client.attentionReason}
+            </Badge>
+          )}
+        </div>
+      ),
     },
     {
       key: "actions",

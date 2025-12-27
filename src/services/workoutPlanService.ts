@@ -72,6 +72,11 @@ const workoutPlanService = {
     const response = await apiService.post<ApiResponse<ClientWorkoutPlan>>(API_ENDPOINTS.workoutPlans.assign, payload);
     return response.data;
   },
+
+  async duplicate(id: string): Promise<WorkoutPlan> {
+    const response = await apiService.post<ApiResponse<WorkoutPlan>>(API_ENDPOINTS.workoutPlans.duplicate(id));
+    return response.data;
+  },
 };
 
 export default workoutPlanService;

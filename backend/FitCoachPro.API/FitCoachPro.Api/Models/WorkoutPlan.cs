@@ -43,6 +43,7 @@ public class WorkoutExercise
     public int Order { get; set; }
 
     public WorkoutDay? WorkoutDay { get; set; }
+    public Exercise? Exercise { get; set; }
 }
 
 public class ClientWorkoutPlan

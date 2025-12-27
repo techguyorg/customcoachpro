@@ -10,8 +10,9 @@ import type {
 export interface CreateExerciseRequest {
   name: string;
   description?: string;
-  muscleGroup: string;
-  equipmentRequired?: string;
+  muscleGroups: string[];
+  tags?: string[];
+  equipment?: string;
   videoUrl?: string;
 }
 
