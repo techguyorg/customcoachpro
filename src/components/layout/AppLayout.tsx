@@ -4,6 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useViewMode } from "@/contexts/ViewModeContext";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { iconTokens, type IconToken } from "@/config/iconTokens";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,21 +29,28 @@ import {
 import { cn } from "@/lib/utils";
 import { NotificationsBell } from "@/components/notifications/NotificationsBell";
 
+type NavItem = {
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  tone: IconToken;
+};
+
 const coachNavItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/clients", label: "Clients", icon: Users },
-  { to: "/check-ins", label: "Check-ins", icon: ClipboardCheck },
-  { to: "/workout-plans", label: "Workouts", icon: Dumbbell },
-  { to: "/diet-plans", label: "Diet Plans", icon: Utensils },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-];
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tone: "brand" },
+  { to: "/clients", label: "Clients", icon: Users, tone: "neutral" },
+  { to: "/check-ins", label: "Check-ins", icon: ClipboardCheck, tone: "warning" },
+  { to: "/workout-plans", label: "Workouts", icon: Dumbbell, tone: "workout" },
+  { to: "/diet-plans", label: "Diet Plans", icon: Utensils, tone: "diet" },
+  { to: "/analytics", label: "Analytics", icon: BarChart3, tone: "analytics" },
+] satisfies NavItem[];
 
 const clientNavItems = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/my-plan", label: "My Plan", icon: Dumbbell },
-  { to: "/check-in", label: "Check-in", icon: ClipboardCheck },
-  { to: "/progress", label: "Progress", icon: BarChart3 },
-];
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tone: "brand" },
+  { to: "/my-plan", label: "My Plan", icon: Dumbbell, tone: "workout" },
+  { to: "/check-in", label: "Check-in", icon: ClipboardCheck, tone: "warning" },
+  { to: "/progress", label: "Progress", icon: BarChart3, tone: "analytics" },
+] satisfies NavItem[];
 
 export function AppLayout() {
   const { user, logout } = useAuth();
@@ -99,7 +107,13 @@ export function AppLayout() {
                   )
                 }
               >
-                <item.icon className="h-4 w-4" />
+                <item.icon
+                  className={cn(
+                    "h-4 w-4",
+                    iconTokens[item.tone].icon,
+                    isActive && "text-primary-foreground"
+                  )}
+                />
                 {item.label}
               </NavLink>
             ))}
@@ -199,7 +213,13 @@ export function AppLayout() {
                     )
                   }
                 >
-                  <item.icon className="h-5 w-5" />
+                  <item.icon
+                    className={cn(
+                      "h-5 w-5",
+                      iconTokens[item.tone].icon,
+                      isActive && "text-primary-foreground"
+                    )}
+                  />
                   {item.label}
                 </NavLink>
               ))}

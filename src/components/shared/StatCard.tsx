@@ -1,3 +1,4 @@
+import { iconTokens, type IconToken } from "@/config/iconTokens";
 import { cn } from '@/lib/utils';
 import { LucideIcon } from 'lucide-react';
 
@@ -11,6 +12,7 @@ interface StatCardProps {
     isPositive: boolean;
   };
   variant?: 'default' | 'primary' | 'secondary' | 'accent';
+  iconTone?: IconToken;
   className?: string;
 }
 
@@ -21,27 +23,43 @@ export function StatCard({
   icon: Icon,
   trend,
   variant = 'default',
+  iconTone,
   className,
 }: StatCardProps) {
   const variants = {
     default: 'bg-card border-border',
-    primary: 'bg-primary/10 border-primary/20',
-    secondary: 'bg-secondary/10 border-secondary/20',
-    accent: 'bg-accent/10 border-accent/20',
+    primary: 'bg-icon-brand/5 border-icon-brand/20',
+    secondary: 'bg-icon-warning/5 border-icon-warning/20',
+    accent: 'bg-icon-analytics/5 border-icon-analytics/20',
   };
 
   const iconVariants = {
-    default: 'bg-muted text-muted-foreground',
-    primary: 'bg-primary/20 text-primary',
-    secondary: 'bg-secondary/20 text-secondary',
-    accent: 'bg-accent/20 text-accent',
+    default: iconTokens.neutral,
+    primary: iconTokens.brand,
+    secondary: iconTokens.warning,
+    accent: iconTokens.analytics,
   };
+
+  const cardToneBorders: Record<IconToken, string> = {
+    neutral: "border-icon-neutral/20",
+    brand: "border-icon-brand/20",
+    warning: "border-icon-warning/20",
+    workout: "border-icon-workout/20",
+    diet: "border-icon-diet/20",
+    analytics: "border-icon-analytics/20",
+    success: "border-icon-success/20",
+  };
+
+  const tone = iconTone ? iconTokens[iconTone] : iconVariants[variant];
+  const cardToneClass = iconTone
+    ? cn(tone.background, cardToneBorders[iconTone])
+    : variants[variant];
 
   return (
     <div
       className={cn(
         'rounded-xl border p-6 transition-all hover:shadow-md',
-        variants[variant],
+        cardToneClass,
         className
       )}
     >
@@ -56,7 +74,7 @@ export function StatCard({
             <p
               className={cn(
                 'text-sm font-medium',
-                trend.isPositive ? 'text-vitality' : 'text-destructive'
+                trend.isPositive ? 'text-icon-success' : 'text-destructive'
               )}
             >
               {trend.isPositive ? '+' : ''}{trend.value}%
@@ -64,7 +82,7 @@ export function StatCard({
             </p>
           )}
         </div>
-        <div className={cn('rounded-xl p-3', iconVariants[variant])}>
+        <div className={cn('rounded-xl p-3', tone.background, tone.icon)}>
           <Icon className="h-6 w-6" />
         </div>
       </div>

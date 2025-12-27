@@ -144,6 +144,40 @@ export function AnalyticsPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <PageHeader
+        title="Analytics"
+        description="Track your coaching performance and client progress"
+      />
+
+      {/* Stats Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          title="Total Clients"
+          value={mockStats.totalClients}
+          subtitle={`${mockStats.activeClients} currently active`}
+          icon={Users}
+          variant="primary"
+          iconTone="brand"
+          trend={{ value: 12, isPositive: true }}
+        />
+        <StatCard
+          title="Check-ins This Month"
+          value={mockStats.checkInsThisMonth}
+          subtitle="Across all clients"
+          icon={ClipboardCheck}
+          variant="secondary"
+          iconTone="warning"
+          trend={{ value: 8, isPositive: true }}
+        />
+        <StatCard
+          title="Avg. Compliance Rate"
+          value={`${mockStats.avgCompliance}%`}
+          subtitle="Diet & workout combined"
+          icon={TrendingUp}
+          variant="accent"
+          iconTone="analytics"
+          trend={{ value: 3, isPositive: true }}
+        />
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <PageHeader title="Analytics" description="Track your coaching performance and client outcomes." />
         <div className="flex flex-wrap items-center gap-3">
@@ -392,11 +426,23 @@ export function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Dumbbell className="h-5 w-5 text-secondary" />
+              <Dumbbell className="h-5 w-5 text-icon-workout" />
               Workout Plans
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Total Plans Created</span>
+                <span className="font-bold">{mockStats.workoutPlans}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Currently Assigned</span>
+                <span className="font-bold">18</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Avg. Completion Rate</span>
+                <span className="font-bold text-icon-success">92%</span>
             {isLoading ? (
               <Skeleton className="h-24 w-full" />
             ) : (
@@ -421,11 +467,23 @@ export function AnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Utensils className="h-5 w-5 text-accent" />
+              <Utensils className="h-5 w-5 text-icon-diet" />
               Diet Plans
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Total Plans Created</span>
+                <span className="font-bold">{mockStats.dietPlans}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Currently Assigned</span>
+                <span className="font-bold">16</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Avg. Compliance Rate</span>
+                <span className="font-bold text-icon-success">85%</span>
             {isLoading ? (
               <Skeleton className="h-24 w-full" />
             ) : (

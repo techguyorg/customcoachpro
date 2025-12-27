@@ -53,9 +53,9 @@ export function CoachDashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "on-track":
-        return <Badge className="bg-vitality/20 text-vitality border-0">On Track</Badge>;
+        return <Badge className="bg-icon-success/15 text-icon-success border-0">On Track</Badge>;
       case "needs-attention":
-        return <Badge className="bg-energy/20 text-energy border-0">Needs Attention</Badge>;
+        return <Badge className="bg-icon-warning/15 text-icon-warning border-0">Needs Attention</Badge>;
       case "behind":
         return <Badge className="bg-destructive/20 text-destructive border-0">Behind</Badge>;
       default:
@@ -89,6 +89,7 @@ export function CoachDashboard() {
       subtitle: `${stats?.activeClients ?? 0} active`,
       icon: Users,
       variant: "primary" as const,
+      iconTone: "brand" as const,
     },
     {
       title: "Pending Check-ins",
@@ -96,6 +97,7 @@ export function CoachDashboard() {
       subtitle: "Awaiting review",
       icon: ClipboardCheck,
       variant: "secondary" as const,
+      iconTone: "warning" as const,
     },
     {
       title: "Workout Plans",
@@ -103,6 +105,7 @@ export function CoachDashboard() {
       subtitle: "Created",
       icon: Dumbbell,
       variant: "accent" as const,
+      iconTone: "workout" as const,
     },
     {
       title: "Diet Plans",
@@ -110,6 +113,7 @@ export function CoachDashboard() {
       subtitle: "Created",
       icon: Utensils,
       variant: "default" as const,
+      iconTone: "diet" as const,
     },
   ];
 
@@ -149,6 +153,7 @@ export function CoachDashboard() {
                 subtitle={card.subtitle}
                 icon={card.icon}
                 variant={card.variant}
+                iconTone={card.iconTone}
               />
             ))}
       </div>
@@ -239,8 +244,8 @@ export function CoachDashboard() {
                   className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-secondary/20 flex items-center justify-center">
-                      <ClipboardCheck className="h-5 w-5 text-secondary" />
+                    <div className="h-10 w-10 rounded-lg bg-icon-warning/10 flex items-center justify-center">
+                      <ClipboardCheck className="h-5 w-5 text-icon-warning" />
                     </div>
                     <div>
                       <p className="font-medium text-foreground">{checkIn.clientName}</p>
@@ -406,7 +411,7 @@ export function CoachDashboard() {
               className="h-auto py-4 flex flex-col gap-2"
               onClick={() => navigate("/clients/new")}
             >
-              <Users className="h-6 w-6 text-primary" />
+              <Users className="h-6 w-6 text-icon-brand" />
               <span>Add New Client</span>
             </Button>
             <Button
@@ -414,7 +419,7 @@ export function CoachDashboard() {
               className="h-auto py-4 flex flex-col gap-2"
               onClick={() => navigate("/workout-plans")}
             >
-              <Dumbbell className="h-6 w-6 text-secondary" />
+              <Dumbbell className="h-6 w-6 text-icon-workout" />
               <span>Workout Plans</span>
             </Button>
             <Button
@@ -422,7 +427,7 @@ export function CoachDashboard() {
               className="h-auto py-4 flex flex-col gap-2"
               onClick={() => navigate("/diet-plans")}
             >
-              <Utensils className="h-6 w-6 text-accent" />
+              <Utensils className="h-6 w-6 text-icon-diet" />
               <span>Diet Plans</span>
             </Button>
             <Button
@@ -430,7 +435,7 @@ export function CoachDashboard() {
               className="h-auto py-4 flex flex-col gap-2"
               onClick={() => navigate("/analytics")}
             >
-              <TrendingUp className="h-6 w-6 text-energy" />
+              <TrendingUp className="h-6 w-6 text-icon-analytics" />
               <span>View Analytics</span>
             </Button>
           </div>

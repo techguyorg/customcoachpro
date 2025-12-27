@@ -32,6 +32,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import checkInService, { CheckIn } from '@/services/checkInService';
+import { iconTokens, type IconToken } from '@/config/iconTokens';
+import { cn } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -52,6 +55,13 @@ const typeIcons: Record<CheckInType, typeof Scale> = {
   photos: Camera,
   workout: Dumbbell,
   diet: Utensils,
+} as const;
+
+const typeIconTones: Record<CheckIn['type'], IconToken> = {
+  weight: 'analytics',
+  photos: 'analytics',
+  workout: 'workout',
+  diet: 'diet',
 };
 
 const typeLabels: Record<CheckInType, string> = {
@@ -298,6 +308,7 @@ export function CheckInsPage() {
 
   const CheckInCard = ({ checkIn }: { checkIn: CheckIn }) => {
     const Icon = typeIcons[checkIn.type];
+    const tone = iconTokens[typeIconTones[checkIn.type]];
     const weightDelta = weightDeltaById[checkIn.id];
     const photos = checkIn.data.photos ?? {};
     const notePreview = checkIn.notes ?? checkIn.data.workoutNotes ?? '';
@@ -376,6 +387,11 @@ export function CheckInsPage() {
         )}
         onClick={() => setSelectedCheckInId(checkIn.id)}
       >
+        <CardContent className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn("p-2 rounded-lg", tone.background)}>
+                <Icon className={cn("h-5 w-5", tone.icon)} />
         <CardContent className="p-4 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-start gap-3">
@@ -409,8 +425,8 @@ export function CheckInsPage() {
               <Badge
                 className={
                   checkIn.status === 'pending'
-                    ? 'bg-energy/20 text-energy border-0'
-                    : 'bg-vitality/20 text-vitality border-0'
+                    ? 'bg-icon-warning/15 text-icon-warning border-0'
+                    : 'bg-icon-success/15 text-icon-success border-0'
                 }
               >
                 {checkIn.status}
@@ -523,7 +539,7 @@ export function CheckInsPage() {
           <div className="space-y-4">
             <div className="p-4 rounded-lg bg-muted">
               <p className="text-sm text-muted-foreground mb-2">Status</p>
-              <Badge className={selectedCheckIn.data.completed ? 'bg-vitality/20 text-vitality' : 'bg-destructive/20 text-destructive'}>
+              <Badge className={selectedCheckIn.data.completed ? 'bg-icon-success/15 text-icon-success' : 'bg-destructive/20 text-destructive'}>
                 {selectedCheckIn.data.completed ? 'Completed' : 'Not Completed'}
               </Badge>
             </div>
@@ -581,6 +597,7 @@ export function CheckInsPage() {
                     />
                   ) : (
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <Camera className="h-8 w-8 text-icon-analytics" />
                       <Camera className="h-8 w-8" />
                       <span className="text-xs capitalize">{angle}</span>
                     </div>
@@ -656,6 +673,8 @@ export function CheckInsPage() {
         description="Review and manage client check-ins"
         actions={
           <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-icon-warning border-icon-warning">
+              {pendingCheckIns.length} pending
             <Badge variant="outline" className="text-energy border-energy">
               {pendingTotal} pending
             </Badge>
@@ -864,6 +883,12 @@ export function CheckInsPage() {
       >
         <TabsList>
           <TabsTrigger value="pending" className="flex items-center gap-2">
+            <ClipboardCheck className="h-4 w-4 text-icon-warning" />
+            Pending ({pendingCheckIns.length})
+          </TabsTrigger>
+          <TabsTrigger value="reviewed" className="flex items-center gap-2">
+            <Eye className="h-4 w-4 text-icon-success" />
+            Reviewed ({reviewedCheckIns.length})
             <ClipboardCheck className="h-4 w-4" />
             Pending ({statusCounts.pending})
           </TabsTrigger>
@@ -959,7 +984,8 @@ export function CheckInsPage() {
                 <DialogTitle className="flex items-center gap-2">
                   {(() => {
                     const Icon = typeIcons[selectedCheckIn.type];
-                    return <Icon className="h-5 w-5 text-primary" />;
+                    const tone = iconTokens[typeIconTones[selectedCheckIn.type]];
+                    return <Icon className={cn("h-5 w-5", tone.icon)} />;
                   })()}
                   {typeLabels[selectedCheckIn.type]}
                 </DialogTitle>
