@@ -56,10 +56,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return response.token;
     } catch {
-      await handleLogout();
       return null;
     }
-  }, [handleLogout]);
+  }, []);
 
   const scheduleBackgroundRefresh = useCallback(
     (token: string | null) => {
@@ -74,10 +73,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const refreshedToken = await performRefresh();
         if (refreshedToken) {
           scheduleBackgroundRefresh(refreshedToken);
+          return;
         }
+
+        await handleLogout();
       }, delay);
     },
-    [clearScheduledRefresh, performRefresh]
+    [clearScheduledRefresh, performRefresh, handleLogout]
   );
 
   useEffect(() => {
