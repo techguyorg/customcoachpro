@@ -26,6 +26,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var foods = await GetScopedFoods(db, userId.Value, role)
                 .OrderBy(f => f.Name)
@@ -38,6 +39,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var food = await GetScopedFoods(db, userId.Value, role)
                 .FirstOrDefaultAsync(f => f.Id == id);
@@ -128,6 +130,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var meals = await GetScopedMeals(db, userId.Value, role)
                 .OrderBy(m => m.Name)
@@ -140,6 +143,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var meal = await GetScopedMeals(db, userId.Value, role)
                 .FirstOrDefaultAsync(m => m.Id == id);
@@ -264,6 +268,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var plans = await GetScopedPlans(db, userId.Value, role)
                 .ToListAsync();
@@ -275,6 +280,7 @@ public static class DietPlanEndpoints
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
+            if (role is not ("coach" or "client")) return Results.Forbid();
 
             var plan = await GetScopedPlans(db, userId.Value, role)
                 .FirstOrDefaultAsync(p => p.Id == id);
@@ -303,6 +309,7 @@ public static class DietPlanEndpoints
             if (userId is null) return Results.Unauthorized();
 
             if (role == "client" && userId != clientId) return Results.Forbid();
+            if (role is not ("coach" or "client")) return Results.Forbid();
             if (role == "coach")
             {
                 var mapped = await db.CoachClients.AnyAsync(cc => cc.CoachId == userId && cc.ClientId == clientId && cc.IsActive);
@@ -347,6 +354,16 @@ public static class DietPlanEndpoints
                     .ToList()
             };
 
+            db.AuditLogs.Add(new AuditLog
+            {
+                CoachId = coachId.Value,
+                ActorId = coachId.Value,
+                EntityId = plan.Id,
+                EntityType = "diet-plan",
+                Action = "created",
+                Details = $"Created diet plan '{plan.Name}'"
+            });
+
             db.DietPlans.Add(plan);
             await db.SaveChangesAsync();
 
@@ -387,6 +404,16 @@ public static class DietPlanEndpoints
             }
 
             plan.UpdatedAt = DateTime.UtcNow;
+            db.AuditLogs.Add(new AuditLog
+            {
+                CoachId = coachId.Value,
+                ActorId = coachId.Value,
+                EntityId = plan.Id,
+                EntityType = "diet-plan",
+                Action = "updated",
+                Details = $"Updated diet plan '{plan.Name}'"
+            });
+
             await db.SaveChangesAsync();
 
             var hydrated = await GetScopedPlans(db, coachId.Value, role)
