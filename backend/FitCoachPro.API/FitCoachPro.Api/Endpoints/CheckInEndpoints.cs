@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FitCoachPro.Api.Data;
 using FitCoachPro.Api.Models;
+using FitCoachPro.Api.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -45,7 +46,7 @@ public static class CheckInEndpoints
             return Results.Ok(ToDto(checkIn, client));
         });
 
-        group.MapPost("/", async (ClaimsPrincipal principal, AppDbContext db, CreateCheckInRequest req) =>
+        group.MapPost("/", async (ClaimsPrincipal principal, AppDbContext db, CreateCheckInRequest req, INotificationQueue notifications) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
@@ -87,6 +88,24 @@ public static class CheckInEndpoints
             var client = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == checkIn.ClientId);
             if (client is null) return Results.NotFound(new { message = "Client not found" });
 
+            // Notify the coach when a client submits a check-in
+            if (checkIn.CoachId != Guid.Empty)
+            {
+                var coach = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == checkIn.CoachId);
+                if (coach is not null)
+                {
+                    var clientName = client.Profile?.DisplayName ?? client.Email;
+                    await notifications.EnqueueAsync(new NotificationEvent(
+                        coach.Id,
+                        "New check-in submitted",
+                        $"{clientName} sent a {checkIn.Type} check-in.",
+                        "check-in",
+                        "/check-ins",
+                        coach.Email
+                    ));
+                }
+            }
+
             return Results.Ok(ToDto(checkIn, client));
         });
 
@@ -127,7 +146,7 @@ public static class CheckInEndpoints
             return Results.Ok(ToDto(checkIn, client));
         });
 
-        group.MapPut("/{id:guid}/review", async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
+        group.MapPut("/{id:guid}/review", async (ClaimsPrincipal principal, AppDbContext db, Guid id, INotificationQueue notifications) =>
         {
             var (userId, role) = GetUser(principal);
             if (userId is null) return Results.Unauthorized();
@@ -141,6 +160,15 @@ public static class CheckInEndpoints
 
             var client = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == checkIn.ClientId);
             if (client is null) return Results.NotFound(new { message = "Client not found" });
+
+            await notifications.EnqueueAsync(new NotificationEvent(
+                client.Id,
+                "Check-in reviewed",
+                "Your coach reviewed your check-in.",
+                "check-in",
+                "/progress",
+                client.Email
+            ));
 
             return Results.Ok(ToDto(checkIn, client));
         });

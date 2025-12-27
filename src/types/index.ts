@@ -204,6 +204,17 @@ export interface ClientDietPlan {
   isActive: boolean;
 }
 
+export interface NotificationItem {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  createdAt: string;
+  readAt?: string | null;
+  isRead: boolean;
+  actionUrl?: string | null;
+}
+
 // Dashboard Stats
 export interface CoachDashboardStats {
   totalClients: number;
