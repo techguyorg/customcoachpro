@@ -1,7 +1,9 @@
 using System.Text;
+using System.Threading.Channels;
 using FitCoachPro.Api.Auth;
 using FitCoachPro.Api.Data;
 using FitCoachPro.Api.Endpoints;
+using FitCoachPro.Api.Notifications;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -40,6 +42,11 @@ builder.Services.AddSwaggerGen(c =>
 
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<JwtTokenService>();
+builder.Services.Configure<AzureEmailOptions>(builder.Configuration.GetSection("AzureEmail"));
+builder.Services.AddSingleton(Channel.CreateUnbounded<NotificationEvent>());
+builder.Services.AddSingleton<INotificationQueue, NotificationQueue>();
+builder.Services.AddSingleton<IEmailNotificationSender, AzureEmailNotificationSender>();
+builder.Services.AddHostedService<NotificationWorker>();
 
 // ✅ DB selection: SQL if available, else InMemory
 var sqlConn = builder.Configuration.GetConnectionString("SqlConnection");
@@ -135,6 +142,7 @@ app.MapCheckInEndpoints();
 app.MapExerciseEndpoints();
 app.MapWorkoutPlanEndpoints();
 app.MapDietPlanEndpoints();
+app.MapNotificationEndpoints();
 
 app.MapControllers();
 

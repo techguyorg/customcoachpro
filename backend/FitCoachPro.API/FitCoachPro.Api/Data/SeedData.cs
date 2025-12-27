@@ -313,6 +313,25 @@ public static class SeedData
             }
         );
 
+        db.Notifications.AddRange(
+            new Notification
+            {
+                UserId = coachId,
+                Title = "Welcome to notifications",
+                Message = "We'll alert you when clients submit new check-ins or updates.",
+                Type = "system",
+                CreatedAt = now.AddHours(-2)
+            },
+            new Notification
+            {
+                UserId = c1Id,
+                Title = "Weekly check-in reminder",
+                Message = "Share an update with your coach to keep your plan on track.",
+                Type = "reminder",
+                CreatedAt = now.AddHours(-1)
+            }
+        );
+
         db.SaveChanges();
     }
 }

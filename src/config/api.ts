@@ -50,6 +50,12 @@ export const API_ENDPOINTS = {
     review: (id: string) => `/checkins/${id}/review`,
   },
 
+  notifications: {
+    base: "/notifications",
+    markRead: (id: string) => `/notifications/${id}/read`,
+    markAllRead: "/notifications/read-all",
+  },
+
   // Exercises
   exercises: {
     base: "/exercises",
