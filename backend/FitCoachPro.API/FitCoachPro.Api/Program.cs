@@ -132,6 +132,7 @@ app.MapClientEndpoints();
 app.MapDashboardEndpoints();
 app.MapProfileEndpoints();
 app.MapCheckInEndpoints();
+app.MapAnalyticsEndpoints();
 app.MapWorkoutPlanEndpoints();
 app.MapDietPlanEndpoints();
 
