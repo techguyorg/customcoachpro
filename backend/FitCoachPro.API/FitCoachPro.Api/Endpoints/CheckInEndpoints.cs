@@ -15,21 +15,6 @@ public static class CheckInEndpoints
 
         group.MapGet("/", (ClaimsPrincipal principal, AppDbContext db, string? status, string? type, Guid? coachId) =>
             GetCheckIns(principal, db, status, type, coachId));
-        group.MapGet("/", async (ClaimsPrincipal principal, AppDbContext db) =>
-        {
-            var (userId, role) = GetUser(principal);
-            if (userId is null) return Results.Unauthorized();
-            if (role is not ("coach" or "client")) return Results.Forbid();
-
-            var scoped = ApplyScope(db, userId.Value, role);
-
-            var results = await scoped
-                .OrderByDescending(c => c.SubmittedAt)
-                .Join(db.Users.Include(u => u.Profile),
-                    c => c.ClientId,
-                    u => u.Id,
-                    (c, u) => ToDto(c, u))
-                .ToListAsync();
 
         group.MapGet("/pending", (ClaimsPrincipal principal, AppDbContext db, string? type, Guid? coachId) =>
             GetCheckIns(principal, db, CheckInStatus.Pending, type, coachId));

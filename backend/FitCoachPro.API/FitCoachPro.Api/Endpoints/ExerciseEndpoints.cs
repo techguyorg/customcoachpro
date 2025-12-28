@@ -144,9 +144,11 @@ public static class ExerciseEndpoints
 
     private static IQueryable<Exercise> GetScopedExercises(AppDbContext db, Guid userId, string role)
     {
+        var systemOwner = Guid.Empty;
+
         if (role == "coach")
         {
-            return db.Exercises.Where(e => e.CoachId == userId);
+            return db.Exercises.Where(e => e.CoachId == userId || e.CoachId == systemOwner);
         }
 
         if (role == "client")
@@ -158,11 +160,11 @@ public static class ExerciseEndpoints
 
             if (coachId != Guid.Empty)
             {
-                return db.Exercises.Where(e => e.CoachId == coachId);
+                return db.Exercises.Where(e => e.CoachId == coachId || e.CoachId == systemOwner);
             }
         }
 
-        return db.Exercises.Where(_ => false);
+        return db.Exercises.Where(e => e.CoachId == systemOwner);
     }
 
     private static ExerciseDto ToDto(Exercise exercise) => new(

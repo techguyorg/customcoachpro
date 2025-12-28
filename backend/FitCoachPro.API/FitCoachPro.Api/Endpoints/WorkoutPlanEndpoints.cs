@@ -284,15 +284,22 @@ public static class WorkoutPlanEndpoints
 
     private static IQueryable<WorkoutPlan> GetScopedPlans(AppDbContext db, Guid userId, string role)
     {
+        var systemOwner = Guid.Empty;
+
         var query = db.WorkoutPlans
             .Include(p => p.Days)
             .ThenInclude(d => d.Exercises)
             .ThenInclude(e => e.Exercise)
-            .AsQueryable();
+            .Where(p => p.CoachId == systemOwner);
 
         if (role == "coach")
         {
-            query = query.Where(p => p.CoachId == userId);
+            query = query.Concat(
+                db.WorkoutPlans
+                    .Include(p => p.Days)
+                    .ThenInclude(d => d.Exercises)
+                    .ThenInclude(e => e.Exercise)
+                    .Where(p => p.CoachId == userId));
         }
         else if (role == "client")
         {
@@ -300,10 +307,15 @@ public static class WorkoutPlanEndpoints
                 .Where(c => c.ClientId == userId && c.IsActive)
                 .Select(c => c.WorkoutPlanId);
 
-            query = query.Where(p => planIds.Contains(p.Id));
+            query = query.Concat(
+                db.WorkoutPlans
+                    .Include(p => p.Days)
+                    .ThenInclude(d => d.Exercises)
+                    .ThenInclude(e => e.Exercise)
+                    .Where(p => planIds.Contains(p.Id)));
         }
 
-        return query;
+        return query.Distinct();
     }
 
     private static (Guid? userId, string role) GetUser(ClaimsPrincipal principal)
