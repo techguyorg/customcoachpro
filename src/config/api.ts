@@ -54,6 +54,15 @@ export const API_ENDPOINTS = {
     base: "/notifications",
     markRead: (id: string) => `/notifications/${id}/read`,
     markAllRead: "/notifications/read-all",
+    renewals: {
+      base: "/notifications/renewals",
+      byClient: (clientId: string) => `/notifications/renewals/client/${clientId}`,
+    },
+  },
+
+  clientNotes: {
+    byClient: (clientId: string) => `/coach/clients/${clientId}/notes`,
+    byId: (clientId: string, noteId: string) => `/coach/clients/${clientId}/notes/${noteId}`,
   },
 
   // Exercises

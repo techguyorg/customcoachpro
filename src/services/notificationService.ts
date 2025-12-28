@@ -6,10 +6,20 @@ export interface MarkAllReadResponse {
   updated: number;
 }
 
+export type RenewalNotificationPreferences = {
+  clientId: string;
+  workoutRenewal: boolean;
+  dietRenewal: boolean;
+};
+
 const notificationService = {
   getNotifications: () => apiService.get<NotificationItem[]>(API_ENDPOINTS.notifications.base),
   markRead: (id: string) => apiService.post<{ ok: boolean }>(API_ENDPOINTS.notifications.markRead(id)),
   markAllRead: () => apiService.post<MarkAllReadResponse>(API_ENDPOINTS.notifications.markAllRead),
+  getRenewalPreferences: (clientId: string) =>
+    apiService.get<RenewalNotificationPreferences>(API_ENDPOINTS.notifications.renewals.byClient(clientId)),
+  updateRenewalPreferences: (preferences: RenewalNotificationPreferences) =>
+    apiService.post<RenewalNotificationPreferences>(API_ENDPOINTS.notifications.renewals.base, preferences),
 };
 
 export default notificationService;
