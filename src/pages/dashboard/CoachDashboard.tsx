@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Users,
   ClipboardCheck,
@@ -101,8 +101,9 @@ export function CoachDashboard() {
   }));
 
   const attentionItems = stats?.attentionItems ?? [];
-  const upcomingRenewals = stats?.upcomingRenewals ?? [];
+  const upcomingRenewals = useMemo(() => stats?.upcomingRenewals ?? [], [stats?.upcomingRenewals]);
   const complianceTrend = stats?.complianceTrend;
+  const [renewalFilter, setRenewalFilter] = useState<"all" | "7" | "14">("all");
 
   const statCards = [
     {
@@ -156,6 +157,28 @@ export function CoachDashboard() {
     const diffInMs = target.getTime() - today.getTime();
     return Math.max(0, Math.ceil(diffInMs / (1000 * 60 * 60 * 24)));
   }
+
+  const filteredRenewals = useMemo(() => {
+    const normalized = upcomingRenewals.map((item) => {
+      const daysRemaining = item.daysRemaining ?? getDaysRemaining(item.renewalDate);
+      return { ...item, daysRemaining };
+    });
+
+    return normalized
+      .filter((item) => {
+        if (renewalFilter === "7") return item.daysRemaining <= 7;
+        if (renewalFilter === "14") return item.daysRemaining <= 14;
+        return true;
+      })
+      .sort((a, b) => (a.daysRemaining ?? 9999) - (b.daysRemaining ?? 9999));
+  }, [renewalFilter, upcomingRenewals]);
+
+  const getRenewalBadgeClasses = (days: number | undefined) => {
+    if (days === undefined) return "bg-muted text-muted-foreground";
+    if (days <= 7) return "bg-destructive/10 text-destructive border-destructive/30";
+    if (days <= 14) return "bg-energy/10 text-energy border-energy/30";
+    return "bg-primary/5 text-primary border-primary/20";
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -393,61 +416,95 @@ export function CoachDashboard() {
                     <CalendarClock className="h-4 w-4 text-primary" />
                     <p className="text-sm font-semibold text-foreground">Upcoming renewals</p>
                   </div>
+                  <div className="flex items-center gap-2">
+                    {[
+                      { key: "all", label: "All" },
+                      { key: "7", label: "<7 days" },
+                      { key: "14", label: "<14 days" },
+                    ].map((filter) => (
+                      <Button
+                        key={filter.key}
+                        size="sm"
+                        variant={renewalFilter === filter.key ? "secondary" : "ghost"}
+                        onClick={() => setRenewalFilter(filter.key as typeof renewalFilter)}
+                      >
+                        {filter.label}
+                      </Button>
+                    ))}
+                  </div>
                   {upcomingRenewals.length === 0 ? (
                     <p className="text-sm text-muted-foreground">No renewals in the next few weeks.</p>
                   ) : (
                     <div className="space-y-2">
-                      {upcomingRenewals.map((item) => {
-                        const planTypeLabel = item.planType === "workout" ? "Workout" : "Nutrition";
-                        const daysRemaining = item.daysRemaining ?? getDaysRemaining(item.renewalDate);
-                        const summary = item.summary ?? `Renews ${formatDate(item.renewalDate)}`;
+                      {filteredRenewals.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No renewals match this filter.</p>
+                      ) : (
+                        filteredRenewals.map((item) => {
+                          const planTypeLabel = item.planType === "workout" ? "Workout" : "Nutrition";
+                          const daysRemaining = item.daysRemaining ?? getDaysRemaining(item.renewalDate);
+                          const summary = item.summary ?? `Renews ${formatDate(item.renewalDate)}`;
 
-                        return (
-                          <div
-                            key={`${item.planType}-${item.planId}-${item.renewalDate}`}
-                            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                            onClick={() =>
-                              navigate(
-                                item.planType === "workout"
-                                  ? `/workout-plans/${item.planId}/edit`
-                                  : `/diet-plans/${item.planId}/edit`,
-                              )
-                            }
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                                <LineChart className="h-5 w-5 text-primary" />
-                              </div>
-                              <div>
-                                <p className="font-medium text-foreground">
-                                  {item.planName} · {item.clientName}
-                                </p>
-                                <p className="text-sm text-muted-foreground">{summary}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Badge variant="secondary" className="capitalize bg-primary/10 text-primary">
-                                    {planTypeLabel}
-                                  </Badge>
-                                  <Badge variant="outline">{daysRemaining}d</Badge>
-                                </div>
-                              </div>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(event) => {
-                                event.stopPropagation();
+                          return (
+                            <div
+                              key={`${item.planType}-${item.planId}-${item.renewalDate}`}
+                              className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                              onClick={() =>
                                 navigate(
                                   item.planType === "workout"
                                     ? `/workout-plans/${item.planId}/edit`
                                     : `/diet-plans/${item.planId}/edit`,
-                                );
-                              }}
+                                )
+                              }
                             >
-                              Edit plan
-                            </Button>
-                          </div>
-                        );
-                      })}
+                              <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                  <LineChart className="h-5 w-5 text-primary" />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-foreground">
+                                    {item.planName} · {item.clientName}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">{summary}</p>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="secondary" className="capitalize bg-primary/10 text-primary">
+                                      {planTypeLabel}
+                                    </Badge>
+                                    <Badge variant="outline" className={getRenewalBadgeClasses(daysRemaining)}>
+                                      {daysRemaining}d remaining
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    navigate(
+                                      item.planType === "workout"
+                                        ? `/workout-plans/${item.planId}/edit`
+                                        : `/diet-plans/${item.planId}/edit`,
+                                    );
+                                  }}
+                                >
+                                  Edit plan
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    navigate(`/clients/${item.clientId}?tab=plans`);
+                                  }}
+                                >
+                                  Adjust renewal
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   )}
                 </div>

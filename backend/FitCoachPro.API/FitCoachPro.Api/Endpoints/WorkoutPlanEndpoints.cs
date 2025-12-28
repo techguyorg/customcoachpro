@@ -286,6 +286,50 @@ public static class WorkoutPlanEndpoints
             return Results.Ok(new { data = ToAssignmentDto(existing), success = true });
         });
 
+        group.MapPut("/assignments/{assignmentId:guid}", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, Guid assignmentId, UpdateWorkoutAssignmentRequest req) =>
+        {
+            var (coachId, role) = GetUser(principal);
+            if (coachId is null || role != "coach") return Results.Forbid();
+
+            var assignment = await db.ClientWorkoutPlans
+                .Include(a => a.WorkoutPlan)
+                .FirstOrDefaultAsync(a => a.Id == assignmentId);
+
+            if (assignment is null) return Results.NotFound();
+            if (assignment.WorkoutPlan is null || assignment.WorkoutPlan.CoachId != coachId) return Results.Forbid();
+
+            var defaultDuration = Math.Max(1, assignment.WorkoutPlan.DurationWeeks) * 7;
+            var baseDuration = assignment.DurationDays ?? defaultDuration;
+            var currentEndDate = assignment.EndDate ?? assignment.StartDate.AddDays(baseDuration);
+
+            DateTime newEndDate;
+
+            if (req.EndDate.HasValue)
+            {
+                newEndDate = req.EndDate.Value.Date;
+            }
+            else if (req.AddDays.HasValue)
+            {
+                newEndDate = currentEndDate.AddDays(req.AddDays.Value);
+            }
+            else
+            {
+                return Results.BadRequest(new { message = "EndDate or AddDays is required" });
+            }
+
+            if (newEndDate <= assignment.StartDate)
+            {
+                return Results.BadRequest(new { message = "End date must be after the start date." });
+            }
+
+            assignment.EndDate = newEndDate;
+            assignment.DurationDays = (int)(newEndDate.Date - assignment.StartDate.Date).TotalDays;
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new { data = ToAssignmentDto(assignment), success = true });
+        });
+
         group.MapPost("/{id:guid}/duplicate", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, Guid id) =>
         {
             var (coachId, role) = GetUser(principal);
@@ -597,3 +641,4 @@ public record WorkoutExerciseDto(Guid Id, Guid? ExerciseId, string? ExerciseName
 public record WorkoutDayDto(Guid Id, string Name, int DayNumber, List<WorkoutExerciseDto> Exercises);
 public record WorkoutPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, string Goal, int DurationWeeks, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt, List<WorkoutDayDto> Days);
 public record ClientWorkoutPlanDto(Guid Id, Guid ClientId, Guid WorkoutPlanId, WorkoutPlanDto? WorkoutPlan, DateTime StartDate, DateTime? EndDate, int? DurationDays, bool IsActive);
+public record UpdateWorkoutAssignmentRequest(DateTime? EndDate, int? AddDays);

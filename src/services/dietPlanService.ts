@@ -34,6 +34,11 @@ export type AssignDietPlanPayload = {
   durationDays?: number;
 };
 
+export type UpdateDietAssignmentPayload = {
+  endDate?: string;
+  addDays?: number;
+};
+
 export type DietPlanTemplate = {
   id?: string;
   name: string;
@@ -80,6 +85,14 @@ const dietPlanService = {
 
   async assign(payload: AssignDietPlanPayload): Promise<ClientDietPlan> {
     const response = await apiService.post<ApiResponse<ClientDietPlan>>(API_ENDPOINTS.dietPlans.assign, payload);
+    return response.data;
+  },
+
+  async updateAssignment(assignmentId: string, payload: UpdateDietAssignmentPayload): Promise<ClientDietPlan> {
+    const response = await apiService.put<ApiResponse<ClientDietPlan>>(
+      API_ENDPOINTS.dietPlans.assignment(assignmentId),
+      payload
+    );
     return response.data;
   },
 };

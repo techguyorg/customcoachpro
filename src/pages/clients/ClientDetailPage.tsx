@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Mail,
@@ -15,6 +15,7 @@ import {
   Pin,
   AlertTriangle,
   LineChart as LineChartIcon,
+  Clock3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,6 +70,7 @@ const convertLength = (value: number | undefined, to: UnitSystem) => {
 export function ClientDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [unitSystem, setUnitSystem] = useState<UnitSystem>("imperial");
@@ -82,6 +84,7 @@ export function ClientDetailPage() {
   const [noteContent, setNoteContent] = useState("");
   const [notePinned, setNotePinned] = useState(false);
   const [noteAttention, setNoteAttention] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") ?? "overview");
 
   const clientId = id ?? "";
 
@@ -242,6 +245,13 @@ export function ClientDetailPage() {
     }
   }, [data?.profile?.preferredUnitSystem]);
 
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && tab !== activeTab) {
+      setActiveTab(tab);
+    }
+  }, [activeTab, searchParams]);
+
   const weightUnit = useMemo(() => (unitSystem === "imperial" ? "lbs" : "kg"), [unitSystem]);
   const lengthUnit = useMemo(() => (unitSystem === "imperial" ? "in" : "cm"), [unitSystem]);
 
@@ -270,6 +280,44 @@ export function ClientDetailPage() {
   const activeWorkoutAssignment = workoutAssignments.find((a) => a.isActive) ?? workoutAssignments[0];
   const activeDietAssignment = dietAssignments.find((a) => a.isActive) ?? dietAssignments[0];
 
+  const updateWorkoutAssignmentMutation = useMutation({
+    mutationFn: (updates: { addDays?: number; endDate?: string }) => {
+      if (!activeWorkoutAssignment) throw new Error("No active workout assignment to update");
+      return workoutPlanService.updateAssignment(activeWorkoutAssignment.id, updates);
+    },
+    onSuccess: () => {
+      toast({ title: "Workout renewal updated" });
+      queryClient.invalidateQueries({ queryKey: ["client", clientId, "workout-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "coach"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to update workout renewal",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateDietAssignmentMutation = useMutation({
+    mutationFn: (updates: { addDays?: number; endDate?: string }) => {
+      if (!activeDietAssignment) throw new Error("No active diet assignment to update");
+      return dietPlanService.updateAssignment(activeDietAssignment.id, updates);
+    },
+    onSuccess: () => {
+      toast({ title: "Diet renewal updated" });
+      queryClient.invalidateQueries({ queryKey: ["client", clientId, "diet-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard", "coach"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Unable to update diet renewal",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const assignedWorkoutPlan =
     activeWorkoutAssignment?.workoutPlan ||
     workoutPlans.find((plan) => plan.id === activeWorkoutAssignment?.workoutPlanId);
@@ -292,6 +340,30 @@ export function ClientDetailPage() {
     const resolved = resolveEndDate(startDate, endDate, durationDays);
     if (!resolved) return null;
     return Math.max(0, differenceInDays(new Date(resolved), new Date()));
+  };
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    const next = new URLSearchParams(searchParams);
+    next.set("tab", value);
+    setSearchParams(next, { replace: true });
+  };
+
+  const countdownBadgeClass = (days: number | null) => {
+    if (days === null) return "bg-muted text-muted-foreground";
+    if (days <= 7) return "bg-destructive/10 text-destructive border-destructive/30";
+    if (days <= 14) return "bg-energy/10 text-energy border-energy/30";
+    return "bg-primary/5 text-primary border-primary/20";
+  };
+
+  const handleWorkoutExtend = (days: number) => {
+    if (!activeWorkoutAssignment) return;
+    updateWorkoutAssignmentMutation.mutate({ addDays: days });
+  };
+
+  const handleDietExtend = (days: number) => {
+    if (!activeDietAssignment) return;
+    updateDietAssignmentMutation.mutate({ addDays: days });
   };
 
   const groupedCheckIns = useMemo(() => {
@@ -679,7 +751,7 @@ export function ClientDetailPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="checkins">Check-ins</TabsTrigger>
@@ -985,9 +1057,15 @@ export function ClientDetailPage() {
                           <p className="text-sm text-muted-foreground line-clamp-2">{assignedWorkoutPlan.description}</p>
                         )}
                       </div>
-                      <Badge variant={activeWorkoutAssignment.isActive ? "secondary" : "outline"}>
-                        {activeWorkoutAssignment.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge variant={activeWorkoutAssignment.isActive ? "secondary" : "outline"}>
+                          {activeWorkoutAssignment.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        <Badge variant="outline" className={countdownBadgeClass(workoutDaysRemaining)}>
+                          <Clock3 className="h-3 w-3 mr-1" />
+                          {workoutDaysRemaining !== null ? `${workoutDaysRemaining}d left` : "Renewal date pending"}
+                        </Badge>
+                      </div>
                     </div>
                     <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
@@ -1028,6 +1106,24 @@ export function ClientDetailPage() {
                         onCheckedChange={(checked) => renewalMutation.mutate({ workoutRenewal: checked })}
                         disabled={!activeWorkoutAssignment || renewalMutation.isPending || isLoadingRenewals}
                       />
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleWorkoutExtend(7)}
+                        disabled={updateWorkoutAssignmentMutation.isPending}
+                      >
+                        Snooze 7 days
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleWorkoutExtend(14)}
+                        disabled={updateWorkoutAssignmentMutation.isPending}
+                      >
+                        Extend 14 days
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -1110,9 +1206,15 @@ export function ClientDetailPage() {
                           <p className="text-sm text-muted-foreground line-clamp-2">{assignedDietPlan.description}</p>
                         )}
                       </div>
-                      <Badge variant={activeDietAssignment.isActive ? "secondary" : "outline"}>
-                        {activeDietAssignment.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge variant={activeDietAssignment.isActive ? "secondary" : "outline"}>
+                          {activeDietAssignment.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        <Badge variant="outline" className={countdownBadgeClass(dietDaysRemaining)}>
+                          <Clock3 className="h-3 w-3 mr-1" />
+                          {dietDaysRemaining !== null ? `${dietDaysRemaining}d left` : "Renewal date pending"}
+                        </Badge>
+                      </div>
                     </div>
                     <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
@@ -1153,6 +1255,24 @@ export function ClientDetailPage() {
                         onCheckedChange={(checked) => renewalMutation.mutate({ dietRenewal: checked })}
                         disabled={!activeDietAssignment || renewalMutation.isPending || isLoadingRenewals}
                       />
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDietExtend(7)}
+                        disabled={updateDietAssignmentMutation.isPending}
+                      >
+                        Snooze 7 days
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDietExtend(14)}
+                        disabled={updateDietAssignmentMutation.isPending}
+                      >
+                        Extend 14 days
+                      </Button>
                     </div>
                   </div>
                 ) : (

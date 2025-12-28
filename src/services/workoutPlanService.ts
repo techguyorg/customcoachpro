@@ -37,6 +37,11 @@ export type AssignWorkoutPlanPayload = {
   durationDays?: number;
 };
 
+export type UpdateWorkoutAssignmentPayload = {
+  endDate?: string;
+  addDays?: number;
+};
+
 const workoutPlanService = {
   async list(): Promise<WorkoutPlan[]> {
     const response = await apiService.get<ApiResponse<WorkoutPlan[]>>(API_ENDPOINTS.workoutPlans.base);
@@ -71,6 +76,14 @@ const workoutPlanService = {
 
   async assign(payload: AssignWorkoutPlanPayload): Promise<ClientWorkoutPlan> {
     const response = await apiService.post<ApiResponse<ClientWorkoutPlan>>(API_ENDPOINTS.workoutPlans.assign, payload);
+    return response.data;
+  },
+
+  async updateAssignment(assignmentId: string, payload: UpdateWorkoutAssignmentPayload): Promise<ClientWorkoutPlan> {
+    const response = await apiService.put<ApiResponse<ClientWorkoutPlan>>(
+      API_ENDPOINTS.workoutPlans.assignment(assignmentId),
+      payload
+    );
     return response.data;
   },
 

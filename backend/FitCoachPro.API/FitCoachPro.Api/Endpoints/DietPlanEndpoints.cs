@@ -573,6 +573,49 @@ public static class DietPlanEndpoints
 
             return Results.Ok(new { data = ToClientDietPlanDto(existing), success = true });
         });
+
+        group.MapPut("/assignments/{assignmentId:guid}", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, Guid assignmentId, UpdateDietAssignmentRequest req) =>
+        {
+            var (coachId, role) = GetUser(principal);
+            if (coachId is null || role != "coach") return Results.Forbid();
+
+            var assignment = await db.ClientDietPlans
+                .Include(a => a.DietPlan)
+                .FirstOrDefaultAsync(a => a.Id == assignmentId);
+
+            if (assignment is null) return Results.NotFound();
+            if (assignment.DietPlan is null || assignment.DietPlan.CoachId != coachId) return Results.Forbid();
+
+            var defaultDuration = assignment.DurationDays ?? 28;
+            var currentEndDate = assignment.EndDate ?? assignment.StartDate.AddDays(defaultDuration);
+
+            DateTime newEndDate;
+
+            if (req.EndDate.HasValue)
+            {
+                newEndDate = req.EndDate.Value.Date;
+            }
+            else if (req.AddDays.HasValue)
+            {
+                newEndDate = currentEndDate.AddDays(req.AddDays.Value);
+            }
+            else
+            {
+                return Results.BadRequest(new { message = "EndDate or AddDays is required" });
+            }
+
+            if (newEndDate <= assignment.StartDate)
+            {
+                return Results.BadRequest(new { message = "End date must be after the start date." });
+            }
+
+            assignment.EndDate = newEndDate;
+            assignment.DurationDays = (int)(newEndDate.Date - assignment.StartDate.Date).TotalDays;
+
+            await db.SaveChangesAsync();
+
+            return Results.Ok(new { data = ToClientDietPlanDto(assignment), success = true });
+        });
     }
 
     private static DietPlan DuplicateDietPlan(DietPlan plan, Guid coachId)
@@ -893,3 +936,4 @@ public record DietMealDto(Guid Id, Guid MealId, MealDto? Meal, string MealTime, 
 public record DietDayDto(Guid Id, int DayNumber, List<DietMealDto> Meals, int TargetCalories, int TargetProtein, int TargetCarbs, int TargetFat);
 public record DietPlanDto(Guid Id, Guid CoachId, Guid CreatedBy, string Name, string? Description, string Goal, List<DietDayDto> Days, bool IsPublished, DateTime CreatedAt, DateTime UpdatedAt);
 public record ClientDietPlanDto(Guid Id, Guid ClientId, Guid DietPlanId, DietPlanDto? DietPlan, DateTime StartDate, DateTime? EndDate, int? DurationDays, bool IsActive);
+public record UpdateDietAssignmentRequest(DateTime? EndDate, int? AddDays);
