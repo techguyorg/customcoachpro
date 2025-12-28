@@ -123,10 +123,18 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    // If SQL Server is used, apply migrations
+    // If SQL Server is used, apply migrations (or create schema if none exist)
+    var hasMigrations = db.Database.GetMigrations().Any();
     if (!string.IsNullOrWhiteSpace(sqlConn))
     {
-        db.Database.Migrate();
+        if (hasMigrations)
+        {
+            db.Database.Migrate();
+        }
+        else
+        {
+            db.Database.EnsureCreated();
+        }
     }
 
     SeedData.EnsureSeeded(db);

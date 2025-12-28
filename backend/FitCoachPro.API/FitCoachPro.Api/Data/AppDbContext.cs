@@ -74,6 +74,12 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<CheckIn>()
             .Property(c => c.Status)
             .HasMaxLength(20);
+        modelBuilder.Entity<CheckIn>().Property(c => c.Weight).HasPrecision(6, 2);
+        modelBuilder.Entity<CheckIn>().Property(c => c.BodyFat).HasPrecision(5, 2);
+        modelBuilder.Entity<CheckIn>().Property(c => c.Waist).HasPrecision(6, 2);
+        modelBuilder.Entity<CheckIn>().Property(c => c.Chest).HasPrecision(6, 2);
+        modelBuilder.Entity<CheckIn>().Property(c => c.Arms).HasPrecision(6, 2);
+        modelBuilder.Entity<CheckIn>().Property(c => c.Thighs).HasPrecision(6, 2);
 
         modelBuilder.Entity<WorkoutPlan>()
             .HasMany(p => p.Days)
@@ -108,6 +114,7 @@ public class AppDbContext : DbContext
             .WithMany(f => f.MealFoods)
             .HasForeignKey(mf => mf.FoodId)
             .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<MealFood>().Property(mf => mf.Quantity).HasPrecision(8, 2);
 
         modelBuilder.Entity<DietPlan>()
             .HasMany(p => p.Days)
@@ -186,5 +193,14 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<AuditLog>()
             .Property(a => a.Details)
             .HasMaxLength(512);
+
+        modelBuilder.Entity<UserProfile>().Property(p => p.HeightCm).HasPrecision(5, 2);
+        modelBuilder.Entity<UserProfile>().Property(p => p.NeckCm).HasPrecision(5, 2);
+        modelBuilder.Entity<UserProfile>().Property(p => p.ArmsCm).HasPrecision(5, 2);
+        modelBuilder.Entity<UserProfile>().Property(p => p.QuadsCm).HasPrecision(5, 2);
+        modelBuilder.Entity<UserProfile>().Property(p => p.HipsCm).HasPrecision(5, 2);
+        modelBuilder.Entity<UserProfile>().Property(p => p.StartWeight).HasPrecision(6, 2);
+        modelBuilder.Entity<UserProfile>().Property(p => p.CurrentWeight).HasPrecision(6, 2);
+        modelBuilder.Entity<UserProfile>().Property(p => p.TargetWeight).HasPrecision(6, 2);
     }
 }
