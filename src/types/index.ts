@@ -217,6 +217,7 @@ export interface NotificationItem {
   readAt?: string | null;
   isRead: boolean;
   actionUrl?: string | null;
+  actionId?: string | null;
 }
 
 export interface ClientNote {
