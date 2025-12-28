@@ -90,7 +90,7 @@ public static class CheckInEndpoints
                         "New check-in submitted",
                         $"{clientName} sent a {checkIn.Type} check-in.",
                         "check-in",
-                        "/check-ins",
+                        $"/check-ins?id={checkIn.Id}",
                         coach.Email
                     ));
                 }

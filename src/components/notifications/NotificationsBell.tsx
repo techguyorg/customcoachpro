@@ -45,17 +45,36 @@ export function NotificationsBell() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["notifications"] }),
   });
 
+  const buildNavigationTarget = useCallback((notification: NotificationItem) => {
+    if (!notification.actionUrl) return null;
+
+    if (notification.actionUrl.startsWith("/check-ins")) {
+      const url = new URL(notification.actionUrl, window.location.origin);
+      const checkInId = notification.actionId ?? url.searchParams.get("id");
+
+      if (checkInId) {
+        url.searchParams.set("id", checkInId);
+        return `${url.pathname}?${url.searchParams.toString()}`;
+      }
+
+      return url.pathname;
+    }
+
+    return notification.actionUrl;
+  }, []);
+
   const handleNotificationClick = useCallback(
     async (notification: NotificationItem) => {
       if (!notification.isRead) {
         await markReadMutation.mutateAsync(notification.id);
       }
 
-      if (notification.actionUrl) {
-        navigate(notification.actionUrl);
+      const target = buildNavigationTarget(notification);
+      if (target) {
+        navigate(target);
       }
     },
-    [markReadMutation, navigate],
+    [buildNavigationTarget, markReadMutation, navigate],
   );
 
   const headerSubtitle =

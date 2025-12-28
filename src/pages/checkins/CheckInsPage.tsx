@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ClipboardCheck,
   Scale,
@@ -120,6 +120,7 @@ export function CheckInsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
   const [previewPhoto, setPreviewPhoto] = useState<PhotoPreview | null>(null);
+  const handledCheckInIdRef = useRef<string | null>(null);
 
   const statusFilter = (searchParams.get("status") as CheckInStatus) ?? "pending";
   const typeFilter = (searchParams.get("type") as CheckInType | null) ?? null;
@@ -127,6 +128,7 @@ export function CheckInsPage() {
   const sortOption = (searchParams.get("sort") as SortOption) ?? "newest";
   const fromDate = searchParams.get("from");
   const toDate = searchParams.get("to");
+  const checkInId = searchParams.get("id");
   const tabValue = statusFilter === "reviewed" ? "reviewed" : "pending";
 
   const queryParams = useMemo(() => {
@@ -254,17 +256,20 @@ export function CheckInsPage() {
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [contextualCheckIns]);
 
-  const updateParam = (key: string, value: string | null) => {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev);
-      if (value) {
-        params.set(key, value);
-      } else {
-        params.delete(key);
-      }
-      return params;
-    });
-  };
+  const updateParam = useCallback(
+    (key: string, value: string | null) => {
+      setSearchParams((prev) => {
+        const params = new URLSearchParams(prev);
+        if (value) {
+          params.set(key, value);
+        } else {
+          params.delete(key);
+        }
+        return params;
+      });
+    },
+    [setSearchParams],
+  );
 
   const handleMarkReviewed = async () => {
     if (!selectedCheckIn) return;
@@ -310,6 +315,20 @@ export function CheckInsPage() {
       </div>
     );
   };
+
+  useEffect(() => {
+    if (!checkInId || !contextualCheckIns.length) return;
+    if (handledCheckInIdRef.current === checkInId) return;
+
+    const targetCheckIn = contextualCheckIns.find((ci) => ci.id === checkInId);
+    if (!targetCheckIn) return;
+
+    handledCheckInIdRef.current = checkInId;
+    if (statusFilter !== targetCheckIn.status) {
+      updateParam("status", targetCheckIn.status);
+    }
+    setSelectedCheckIn(targetCheckIn);
+  }, [checkInId, contextualCheckIns, statusFilter, updateParam]);
 
   const renderSummary = (checkIn: CheckIn) => {
     const previous = previousCheckInsById[checkIn.id];
