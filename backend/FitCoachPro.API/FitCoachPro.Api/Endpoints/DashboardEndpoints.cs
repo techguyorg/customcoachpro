@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FitCoachPro.Api.Data;
 using FitCoachPro.Api.Models;
+using FitCoachPro.Api.Notifications;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,13 +13,15 @@ public static class DashboardEndpoints
     {
         var group = app.MapGroup("/api/dashboard").RequireAuthorization();
 
-        group.MapGet("/coach", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db) =>
+        group.MapGet("/coach", [Authorize(Roles = "coach")] async (ClaimsPrincipal principal, AppDbContext db, INotificationQueue notifications) =>
         {
             var coachIdStr = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub");
             if (coachIdStr is null || !Guid.TryParse(coachIdStr, out var coachId))
                 return Results.Unauthorized();
 
             var nowDate = DateTime.UtcNow.Date;
+
+            var coach = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == coachId);
 
             // IMPORTANT: Do NOT run multiple EF queries concurrently on the same DbContext.
             // EF Core DbContext is not thread-safe and does not allow overlapping operations.
@@ -40,7 +43,7 @@ public static class DashboardEndpoints
                 .Select(u => new { u.Id, Name = u.Profile!.DisplayName ?? u.Email })
                 .ToDictionaryAsync(x => x.Id, x => x.Name);
 
-            var attentionItems = await db.CheckIns
+            var checkInAttentionItems = await db.CheckIns
                 .AsNoTracking()
                 .Where(c => c.CoachId == coachId &&
                             c.Status == CheckInStatus.Pending &&
@@ -100,10 +103,89 @@ public static class DashboardEndpoints
                     x.planId,
                     x.planName,
                     x.planType,
-                    x.renewalDate
+                    x.renewalDate,
+                    daysRemaining = Math.Max(0, (x.renewalDate.Date - nowDate).Days),
+                    summary = $"{FormatPlanType(x.planType)} plan renews {x.renewalDate:MMM d}",
+                    actionUrl = x.planType == "workout"
+                        ? $"/workout-plans/{x.planId}/edit"
+                        : $"/diet-plans/{x.planId}/edit"
                 })
-                .OrderBy(x => x.renewalDate)
-                .Take(10)
+                .OrderBy(x => x.daysRemaining)
+                .ThenBy(x => x.renewalDate)
+                .Take(15)
+                .ToList();
+
+            var renewalAttention = upcomingRenewals
+                .Where(r => r.daysRemaining <= 7)
+                .Select(r => new
+                {
+                    r.ClientId,
+                    r.clientName,
+                    r.planName,
+                    r.planId,
+                    r.planType,
+                    r.actionUrl,
+                    r.daysRemaining,
+                    r.renewalDate,
+                    Summary = $"{FormatPlanType(r.planType)} plan renews in {r.daysRemaining} days",
+                })
+                .ToList();
+
+            var existingRenewalNotifications = await db.Notifications
+                .Where(n => n.UserId == coachId && n.Type == "renewal")
+                .Select(n => new { n.ActionUrl, n.CreatedAt })
+                .ToListAsync();
+
+            foreach (var renewal in renewalAttention)
+            {
+                var hasRecentNotification = existingRenewalNotifications.Any(n =>
+                    string.Equals(n.ActionUrl, renewal.actionUrl, StringComparison.OrdinalIgnoreCase) &&
+                    n.CreatedAt >= renewal.renewalDate.AddDays(-7));
+
+                if (hasRecentNotification)
+                {
+                    continue;
+                }
+
+                await notifications.EnqueueAsync(new NotificationEvent(
+                    coachId,
+                    $"{renewal.clientName} renewal in {renewal.daysRemaining} days",
+                    $"{renewal.clientName}'s {FormatPlanType(renewal.planType)} plan \"{renewal.planName}\" renews on {renewal.renewalDate:MMM d}",
+                    "renewal",
+                    renewal.actionUrl,
+                    coach?.Email
+                ));
+            }
+
+            var attentionItems = checkInAttentionItems
+                .Select(c => new
+                {
+                    c.ClientId,
+                    clientName = clientNames.TryGetValue(c.ClientId, out var name) ? name : "Client",
+                    c.Type,
+                    summary = $"{FormatCheckInType(c.Type)} check-in pending",
+                    c.SubmittedAt,
+                    planId = (Guid?)null,
+                    planType = (string?)null,
+                    daysRemaining = (int?)null,
+                    actionUrl = (string?)null
+                })
+                .Concat(renewalAttention.Select(r => new
+                {
+                    r.ClientId,
+                    r.clientName,
+                    r.planName,
+                    Type = "renewal",
+                    summary = r.Summary,
+                    SubmittedAt = (DateTime?)r.renewalDate,
+                    planId = (Guid?)r.planId,
+                    planType = r.planType,
+                    daysRemaining = (int?)r.daysRemaining,
+                    actionUrl = r.actionUrl
+                }))
+                .OrderBy(item => item.Type == "renewal" ? 0 : 1)
+                .ThenBy(item => item.daysRemaining ?? int.MaxValue)
+                .ThenByDescending(item => item.SubmittedAt)
                 .ToList();
 
             var complianceSamples = await db.CheckIns
@@ -137,14 +219,7 @@ public static class DashboardEndpoints
                 pendingCheckIns,
                 workoutPlansCreated,
                 dietPlansCreated,
-                attentionItems = attentionItems.Select(c => new
-                {
-                    c.ClientId,
-                    clientName = clientNames.TryGetValue(c.ClientId, out var name) ? name : "Client",
-                    c.Type,
-                    summary = $"{FormatCheckInType(c.Type)} check-in pending",
-                    c.SubmittedAt
-                }),
+                attentionItems,
                 upcomingRenewals,
                 complianceTrend
             });
@@ -215,5 +290,12 @@ public static class DashboardEndpoints
         _ when string.IsNullOrWhiteSpace(type) => "Check-in",
         _ when type.Length == 1 => type.ToUpper(),
         _ => $"{char.ToUpper(type[0])}{type.Substring(1)}"
+    };
+
+    private static string FormatPlanType(string? planType) => planType switch
+    {
+        "diet" => "Nutrition",
+        "workout" => "Workout",
+        _ => "Plan"
     };
 }

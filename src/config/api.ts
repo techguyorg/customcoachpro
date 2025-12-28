@@ -78,6 +78,7 @@ export const API_ENDPOINTS = {
     byId: (id: string) => `/workout-plans/${id}`,
     byCoach: (coachId: string) => `/workout-plans/coach/${coachId}`,
     assign: "/workout-plans/assign",
+    assignment: (assignmentId: string) => `/workout-plans/assignments/${assignmentId}`,
     duplicate: (id: string) => `/workout-plans/${id}/duplicate`,
     clientPlans: (clientId: string) => `/workout-plans/client/${clientId}`,
   },
@@ -103,6 +104,7 @@ export const API_ENDPOINTS = {
     byCoach: (coachId: string) => `/diet-plans/coach/${coachId}`,
     templates: "/diet-plans/templates",
     assign: "/diet-plans/assign",
+    assignment: (assignmentId: string) => `/diet-plans/assignments/${assignmentId}`,
     clientPlans: (clientId: string) => `/diet-plans/client/${clientId}`,
   },
 

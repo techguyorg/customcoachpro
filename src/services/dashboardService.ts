@@ -24,6 +24,11 @@ export type AttentionItem = {
   clientName: string;
   type: string;
   summary: string;
+  planName?: string;
+  planId?: string;
+  planType?: "workout" | "diet" | string;
+  daysRemaining?: number | null;
+  actionUrl?: string | null;
   submittedAt?: string;
 };
 
@@ -36,6 +41,7 @@ export type UpcomingRenewal = {
   renewalDate: string;
   daysRemaining?: number;
   summary?: string;
+  actionUrl?: string;
 };
 
 export type ComplianceTrend = {
