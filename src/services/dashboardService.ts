@@ -34,7 +34,8 @@ export type UpcomingRenewal = {
   planName: string;
   planType: "workout" | "diet";
   renewalDate: string;
-  daysRemaining: number;
+  daysRemaining?: number;
+  summary?: string;
 };
 
 export type ComplianceTrend = {
