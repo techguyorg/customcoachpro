@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ClipboardCheck, Scale, Camera, Dumbbell, Utensils, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useSearchParams } from "react-router-dom";
 
 interface CheckIn {
   id: string;
@@ -81,9 +82,19 @@ const typeLabels = {
 export function CheckInsPage() {
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckIn | null>(null);
   const [checkIns] = useState<CheckIn[]>(mockCheckIns);
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const pendingCheckIns = checkIns.filter((c) => c.status === "pending");
-  const reviewedCheckIns = checkIns.filter((c) => c.status === "reviewed");
+  const statusFilter = searchParams.get("status");
+  const clientIdFilter = searchParams.get("clientId");
+  const tabValue = statusFilter === "reviewed" ? "reviewed" : "pending";
+
+  const filteredCheckIns = useMemo(
+    () => checkIns.filter((checkIn) => !clientIdFilter || checkIn.clientId === clientIdFilter),
+    [checkIns, clientIdFilter],
+  );
+
+  const pendingCheckIns = filteredCheckIns.filter((c) => c.status === "pending");
+  const reviewedCheckIns = filteredCheckIns.filter((c) => c.status === "reviewed");
 
   const CheckInCard = ({ checkIn }: { checkIn: CheckIn }) => {
     const Icon = typeIcons[checkIn.type];
@@ -212,7 +223,20 @@ export function CheckInsPage() {
         }
       />
 
-      <Tabs defaultValue="pending" className="space-y-4">
+      <Tabs
+        value={tabValue}
+        onValueChange={(value) =>
+          setSearchParams((prev) => {
+            const params = new URLSearchParams(prev);
+            params.set("status", value);
+            if (clientIdFilter) {
+              params.set("clientId", clientIdFilter);
+            }
+            return params;
+          })
+        }
+        className="space-y-4"
+      >
         <TabsList>
           <TabsTrigger value="pending" className="flex items-center gap-2">
             <ClipboardCheck className="h-4 w-4" />

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   Users,
   ClipboardCheck,
@@ -23,6 +24,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import dashboardService from "@/services/dashboardService";
 import coachService from "@/services/coachService";
+import checkInService from "@/services/checkInService";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 
@@ -50,6 +52,20 @@ export function CoachDashboard() {
 
   const name = user?.displayName || user?.firstName || "Coach";
 
+  const {
+    data: pendingCheckIns,
+    isLoading: pendingCheckInsLoading,
+    isError: pendingCheckInsError,
+  } = useQuery({
+    queryKey: ["check-ins", "pending"],
+    queryFn: () => checkInService.getCheckIns({ status: "pending" }),
+  });
+
+  const { data: checkIns } = useQuery({
+    queryKey: ["check-ins", "latest"],
+    queryFn: () => checkInService.getCheckIns({ sortBy: "submittedAt", sortDirection: "desc" }),
+  });
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "on-track":
@@ -64,19 +80,25 @@ export function CoachDashboard() {
   };
 
   // Keep demo widgets but use real client list as "recent"
+  const lastCheckInByClient = useMemo(() => {
+    const map: Record<string, string> = {};
+    (checkIns ?? []).forEach((checkIn) => {
+      const existing = map[checkIn.clientId];
+      if (!existing || new Date(checkIn.submittedAt) > new Date(existing)) {
+        map[checkIn.clientId] = checkIn.submittedAt;
+      }
+    });
+    return map;
+  }, [checkIns]);
+
   const recentClients = (clients ?? []).slice(0, 4).map((c) => ({
     id: c.id,
     displayName: c.displayName,
     avatarUrl: "",
-    lastCheckIn: "—",
+    lastCheckIn: lastCheckInByClient[c.id] ? formatDate(lastCheckInByClient[c.id]) : "—",
     status: c.attentionReason ? "needs-attention" : "on-track",
     attentionReason: c.attentionReason,
   }));
-
-  const pendingCheckIns = [
-    { id: "1", clientName: "—", type: "Weight", date: "—" },
-    { id: "2", clientName: "—", type: "Workout", date: "—" },
-  ];
 
   const attentionItems = stats?.attentionItems ?? [];
   const upcomingRenewals = stats?.upcomingRenewals ?? [];
@@ -117,15 +139,23 @@ export function CoachDashboard() {
     },
   ];
 
-  const formatDate = (value?: string) => {
+  function formatDate(value?: string) {
     if (!value) return "—";
     return new Date(value).toLocaleDateString();
-  };
+  }
 
-  const formatRelativeTime = (value?: string) => {
+  function formatRelativeTime(value?: string) {
     if (!value) return "—";
     return formatDistanceToNow(new Date(value), { addSuffix: true });
-  };
+  }
+
+  function getDaysRemaining(value?: string) {
+    if (!value) return 0;
+    const today = new Date();
+    const target = new Date(value);
+    const diffInMs = target.getTime() - today.getTime();
+    return Math.max(0, Math.ceil(diffInMs / (1000 * 60 * 60 * 24)));
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -230,32 +260,71 @@ export function CoachDashboard() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg">Pending Check-ins</CardTitle>
-              <CardDescription>Next iteration (Sprint 3)</CardDescription>
+              <CardDescription>Awaiting your review</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/check-ins")}>
+            <Button variant="ghost" size="sm" onClick={() => navigate("/check-ins?status=pending")}>
               View all
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {pendingCheckIns.map((checkIn) => (
-                <div
-                  key={checkIn.id}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-icon-warning/10 flex items-center justify-center">
-                      <ClipboardCheck className="h-5 w-5 text-icon-warning" />
+            {pendingCheckInsLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-lg" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-1/3" />
+                      <Skeleton className="h-3 w-1/4" />
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground">{checkIn.clientName}</p>
-                      <p className="text-sm text-muted-foreground">{checkIn.date}</p>
+                    <Skeleton className="h-8 w-20 rounded-md" />
+                  </div>
+                ))}
+              </div>
+            ) : pendingCheckInsError ? (
+              <p className="text-sm text-destructive">Unable to load pending check-ins.</p>
+            ) : pendingCheckIns && pendingCheckIns.length > 0 ? (
+              <div className="space-y-4">
+                {pendingCheckIns.map((checkIn) => (
+                  <div
+                    key={checkIn.id}
+                    className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-icon-warning/10 flex items-center justify-center">
+                        <ClipboardCheck className="h-5 w-5 text-icon-warning" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground">{checkIn.clientName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Submitted {formatDate(checkIn.submittedAt)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="capitalize">
+                        {checkIn.type}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          navigate({
+                            pathname: "/check-ins",
+                            search: new URLSearchParams({
+                              status: "pending",
+                              clientId: checkIn.clientId,
+                            }).toString(),
+                          })
+                        }
+                      >
+                        Review
+                      </Button>
                     </div>
                   </div>
-                  <Badge variant="outline">{checkIn.type}</Badge>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No pending check-ins. Great job staying on top of things!</p>
+            )}
           </CardContent>
         </Card>
 
@@ -328,34 +397,57 @@ export function CoachDashboard() {
                     <p className="text-sm text-muted-foreground">No renewals in the next few weeks.</p>
                   ) : (
                     <div className="space-y-2">
-                      {upcomingRenewals.map((item) => (
-                        <div
-                          key={`${item.planType}-${item.planId}-${item.renewalDate}`}
-                          className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                          onClick={() =>
-                            navigate(
-                              item.planType === "workout"
-                                ? `/workout-plans/${item.planId}/edit`
-                                : `/diet-plans/${item.planId}/edit`,
-                            )
-                          }
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                              <LineChart className="h-5 w-5 text-primary" />
+                      {upcomingRenewals.map((item) => {
+                        const planTypeLabel = item.planType === "workout" ? "Workout" : "Nutrition";
+                        const daysRemaining = item.daysRemaining ?? getDaysRemaining(item.renewalDate);
+                        const summary = item.summary ?? `Renews ${formatDate(item.renewalDate)}`;
+
+                        return (
+                          <div
+                            key={`${item.planType}-${item.planId}-${item.renewalDate}`}
+                            className="flex items-center justify-between p-3 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                            onClick={() =>
+                              navigate(
+                                item.planType === "workout"
+                                  ? `/workout-plans/${item.planId}/edit`
+                                  : `/diet-plans/${item.planId}/edit`,
+                              )
+                            }
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                <LineChart className="h-5 w-5 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-foreground">
+                                  {item.planName} · {item.clientName}
+                                </p>
+                                <p className="text-sm text-muted-foreground">{summary}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Badge variant="secondary" className="capitalize bg-primary/10 text-primary">
+                                    {planTypeLabel}
+                                  </Badge>
+                                  <Badge variant="outline">{daysRemaining}d</Badge>
+                                </div>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium text-foreground">
-                                {item.planName} · {item.clientName}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                Renews {formatDate(item.renewalDate)} • {item.planType === "workout" ? "Workout" : "Nutrition"}
-                              </p>
-                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                navigate(
+                                  item.planType === "workout"
+                                    ? `/workout-plans/${item.planId}/edit`
+                                    : `/diet-plans/${item.planId}/edit`,
+                                );
+                              }}
+                            >
+                              Edit plan
+                            </Button>
                           </div>
-                          <Badge variant="outline">{item.daysRemaining}d</Badge>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
