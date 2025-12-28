@@ -9,6 +9,21 @@ export type CoachClientListItem = {
   currentWeight?: number;
   targetWeight?: number;
   attentionReason?: string | null;
+  averageDietCompliance?: number | null;
+  activeWorkoutPlan?: {
+    planId: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    daysRemaining: number;
+  } | null;
+  activeDietPlan?: {
+    planId: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+    daysRemaining: number;
+  } | null;
 };
 
 export type CoachClientDetail = {
