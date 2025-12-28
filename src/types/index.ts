@@ -132,6 +132,7 @@ export interface ClientWorkoutPlan {
   workoutPlan?: WorkoutPlan;
   startDate: string;
   endDate?: string;
+  durationDays?: number | null;
   isActive: boolean;
 }
 
@@ -203,6 +204,7 @@ export interface ClientDietPlan {
   dietPlan?: DietPlan;
   startDate: string;
   endDate?: string;
+  durationDays?: number | null;
   isActive: boolean;
 }
 

@@ -149,6 +149,30 @@ public class AppDbContext : DbContext
             .WithOne(we => we.Exercise)
             .HasForeignKey(we => we.ExerciseId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Exercise>()
+            .Property(e => e.IsPublished)
+            .HasDefaultValue(false);
+        modelBuilder.Entity<Food>()
+            .Property(f => f.IsPublished)
+            .HasDefaultValue(false);
+        modelBuilder.Entity<Meal>()
+            .Property(m => m.IsPublished)
+            .HasDefaultValue(false);
+        modelBuilder.Entity<WorkoutPlan>()
+            .Property(p => p.IsPublished)
+            .HasDefaultValue(false);
+        modelBuilder.Entity<DietPlan>()
+            .Property(p => p.IsPublished)
+            .HasDefaultValue(false);
+
+        modelBuilder.Entity<Exercise>().HasIndex(e => e.Name);
+        modelBuilder.Entity<Exercise>().HasIndex(e => e.Tags);
+        modelBuilder.Entity<Exercise>().HasIndex(e => e.PrimaryMuscleGroup);
+        modelBuilder.Entity<Food>().HasIndex(f => f.Name);
+        modelBuilder.Entity<Meal>().HasIndex(m => m.Name);
+        modelBuilder.Entity<WorkoutPlan>().HasIndex(p => p.Name);
+        modelBuilder.Entity<DietPlan>().HasIndex(p => p.Name);
         modelBuilder.Entity<Notification>()
             .Property(n => n.Type)
             .HasMaxLength(64);

@@ -1,0 +1,53 @@
+[
+  {
+    "name": "Balanced Weight Loss",
+    "description": "Moderate calories with high protein and simple meals.",
+    "days": [
+      {
+        "dayNumber": 1,
+        "targetCalories": 2000,
+        "targetProtein": 160,
+        "targetCarbs": 180,
+        "targetFat": 70,
+        "meals": [
+          { "meal": "Greek Yogurt Parfait", "mealTime": "Breakfast", "order": 1 },
+          { "meal": "Chicken Quinoa Bowl", "mealTime": "Lunch", "order": 2 },
+          { "meal": "Protein Snack", "mealTime": "Snack", "order": 3 },
+          { "meal": "Salmon and Rice Plate", "mealTime": "Dinner", "order": 4 }
+        ]
+      },
+      {
+        "dayNumber": 2,
+        "targetCalories": 2000,
+        "targetProtein": 160,
+        "targetCarbs": 190,
+        "targetFat": 65,
+        "meals": [
+          { "meal": "Greek Yogurt Parfait", "mealTime": "Breakfast", "order": 1 },
+          { "meal": "Chicken Quinoa Bowl", "mealTime": "Lunch", "order": 2 },
+          { "meal": "Protein Snack", "mealTime": "Snack", "order": 3 },
+          { "meal": "Salmon and Rice Plate", "mealTime": "Dinner", "order": 4 }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "Muscle Gain Basics",
+    "description": "Higher calorie approach with consistent protein.",
+    "days": [
+      {
+        "dayNumber": 1,
+        "targetCalories": 2600,
+        "targetProtein": 180,
+        "targetCarbs": 260,
+        "targetFat": 85,
+        "meals": [
+          { "meal": "Greek Yogurt Parfait", "mealTime": "Breakfast", "order": 1 },
+          { "meal": "Chicken Quinoa Bowl", "mealTime": "Lunch", "order": 2 },
+          { "meal": "Protein Snack", "mealTime": "Snack", "order": 3 },
+          { "meal": "Salmon and Rice Plate", "mealTime": "Dinner", "order": 4 }
+        ]
+      }
+    ]
+  }
+]
