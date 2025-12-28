@@ -19,6 +19,8 @@ public static class CoachEndpoints
             var coachId = GetUserId(principal);
             if (coachId is null) return Results.Unauthorized();
 
+            var today = DateTime.UtcNow.Date;
+
             var clients = await db.CoachClients
                 .Where(x => x.CoachId == coachId.Value && x.IsActive)
                 .Join(db.Users.Include(u => u.Profile),
@@ -35,12 +37,38 @@ public static class CoachEndpoints
                 .ToListAsync();
 
             var clientIds = clients.Select(c => c.Id).ToList();
+
+            var workoutAssignments = clientIds.Count == 0
+                ? new List<ClientWorkoutPlan>()
+                : await db.ClientWorkoutPlans
+                    .AsNoTracking()
+                    .Include(a => a.WorkoutPlan)
+                    .Where(a => a.IsActive && a.WorkoutPlan != null && clientIds.Contains(a.ClientId))
+                    .ToListAsync();
+
+            var dietAssignments = clientIds.Count == 0
+                ? new List<ClientDietPlan>()
+                : await db.ClientDietPlans
+                    .AsNoTracking()
+                    .Include(a => a.DietPlan)
+                    .Where(a => a.IsActive && a.DietPlan != null && clientIds.Contains(a.ClientId))
+                    .ToListAsync();
+
             var checkIns = clientIds.Count == 0
                 ? new List<CheckIn>()
                 : await db.CheckIns
+                    .AsNoTracking()
                     .Where(ci => clientIds.Contains(ci.ClientId))
                     .OrderByDescending(ci => ci.SubmittedAt)
                     .ToListAsync();
+
+            var latestWorkoutAssignmentByClient = workoutAssignments
+                .GroupBy(a => a.ClientId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.StartDate).First());
+
+            var latestDietAssignmentByClient = dietAssignments
+                .GroupBy(a => a.ClientId)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.StartDate).First());
 
             var response = clients
                 .Select(client => new
@@ -51,7 +79,14 @@ public static class CoachEndpoints
                     startDate = client.StartDate,
                     currentWeight = client.CurrentWeight,
                     targetWeight = client.TargetWeight,
-                    attentionReason = GetAttentionReason(client, checkIns)
+                    attentionReason = GetAttentionReason(client, checkIns),
+                    averageDietCompliance = GetAverageDietCompliance(client.Id, checkIns),
+                    activeWorkoutPlan = latestWorkoutAssignmentByClient.TryGetValue(client.Id, out var workout)
+                        ? ToWorkoutPlanSummary(workout, today)
+                        : null,
+                    activeDietPlan = latestDietAssignmentByClient.TryGetValue(client.Id, out var diet)
+                        ? ToDietPlanSummary(diet, today)
+                        : null
                 })
                 .ToList();
 
@@ -283,6 +318,57 @@ public static class CoachEndpoints
 
         return null;
     }
+
+    private static double? GetAverageDietCompliance(Guid clientId, IReadOnlyList<CheckIn> checkIns)
+    {
+        var recentCompliance = checkIns
+            .Where(ci => ci.ClientId == clientId && ci.Type == CheckInType.Diet && ci.DietCompliance.HasValue)
+            .OrderByDescending(ci => ci.SubmittedAt)
+            .Take(3)
+            .Select(ci => (double)ci.DietCompliance!.Value)
+            .ToList();
+
+        return recentCompliance.Any()
+            ? Math.Round(recentCompliance.Average(), 1)
+            : null;
+    }
+
+    private static PlanSummary ToWorkoutPlanSummary(ClientWorkoutPlan assignment, DateTime today)
+    {
+        var durationDays = assignment.DurationDays
+                           ?? Math.Max(1, assignment.WorkoutPlan?.DurationWeeks ?? 0) * 7;
+
+        var endDate = assignment.EndDate ?? assignment.StartDate.AddDays(durationDays);
+        var daysRemaining = Math.Max(0, (endDate.Date - today).Days);
+
+        return new PlanSummary(
+            assignment.WorkoutPlanId,
+            assignment.WorkoutPlan?.Name ?? "Workout plan",
+            assignment.StartDate,
+            endDate,
+            daysRemaining);
+    }
+
+    private static PlanSummary ToDietPlanSummary(ClientDietPlan assignment, DateTime today)
+    {
+        var durationDays = assignment.DurationDays ?? 28;
+        var endDate = assignment.EndDate ?? assignment.StartDate.AddDays(durationDays);
+        var daysRemaining = Math.Max(0, (endDate.Date - today).Days);
+
+        return new PlanSummary(
+            assignment.DietPlanId,
+            assignment.DietPlan?.Name ?? "Diet plan",
+            assignment.StartDate,
+            endDate,
+            daysRemaining);
+    }
+
+    private record PlanSummary(
+        Guid PlanId,
+        string Name,
+        DateTime StartDate,
+        DateTime EndDate,
+        int DaysRemaining);
 
     public record CreateClientRequest(
         string FirstName,
