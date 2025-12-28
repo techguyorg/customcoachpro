@@ -219,6 +219,16 @@ export interface NotificationItem {
   actionUrl?: string | null;
 }
 
+export interface ClientNote {
+  id: string;
+  clientId: string;
+  content: string;
+  createdAt: string;
+  createdBy?: string;
+  pinned?: boolean;
+  needsAttention?: boolean;
+}
+
 // Dashboard Stats
 export interface CoachDashboardStats {
   totalClients: number;
