@@ -20,20 +20,19 @@ public static class DashboardEndpoints
 
             var nowDate = DateTime.UtcNow.Date;
 
-            var totalClientsTask = db.CoachClients.CountAsync(x => x.CoachId == coachId && x.IsActive);
-            var pendingCheckInsTask = db.CheckIns.CountAsync(x => x.CoachId == coachId && x.Status == CheckInStatus.Pending);
-            var workoutPlansCreatedTask = db.WorkoutPlans.CountAsync(x => x.CoachId == coachId);
-            var dietPlansCreatedTask = db.DietPlans.CountAsync(x => x.CoachId == coachId);
-            var activeClientIdsTask = db.CoachClients
+            // IMPORTANT: Do NOT run multiple EF queries concurrently on the same DbContext.
+            // EF Core DbContext is not thread-safe and does not allow overlapping operations.
+            var totalClients = await db.CoachClients.CountAsync(x => x.CoachId == coachId && x.IsActive);
+            var pendingCheckIns = await db.CheckIns.CountAsync(x => x.CoachId == coachId && x.Status == CheckInStatus.Pending);
+            var workoutPlansCreated = await db.WorkoutPlans.CountAsync(x => x.CoachId == coachId);
+            var dietPlansCreated = await db.DietPlans.CountAsync(x => x.CoachId == coachId);
+
+            var activeClientIds = await db.CoachClients
                 .Where(x => x.CoachId == coachId && x.IsActive)
                 .Select(x => x.ClientId)
                 .ToListAsync();
 
-            await Task.WhenAll(totalClientsTask, pendingCheckInsTask, workoutPlansCreatedTask, dietPlansCreatedTask, activeClientIdsTask);
-
-            var totalClients = await totalClientsTask;
             var activeClients = totalClients;
-            var activeClientIds = await activeClientIdsTask;
 
             var clientNames = await db.Users
                 .AsNoTracking()
@@ -43,7 +42,9 @@ public static class DashboardEndpoints
 
             var attentionItems = await db.CheckIns
                 .AsNoTracking()
-                .Where(c => c.CoachId == coachId && c.Status == CheckInStatus.Pending && activeClientIds.Contains(c.ClientId))
+                .Where(c => c.CoachId == coachId &&
+                            c.Status == CheckInStatus.Pending &&
+                            activeClientIds.Contains(c.ClientId))
                 .OrderByDescending(c => c.SubmittedAt)
                 .Take(5)
                 .Select(c => new
@@ -92,32 +93,31 @@ public static class DashboardEndpoints
 
             var upcomingRenewals = workoutRenewals
                 .Concat(dietRenewals)
-                .Where(r => r.renewalDate >= nowDate.AddDays(-1))
-                .OrderBy(r => r.renewalDate)
-                .Take(5)
-                .Select(r => new
+                .Select(x => new
                 {
-                    r.planId,
-                    r.planName,
-                    r.planType,
-                    r.renewalDate,
-                    clientId = r.ClientId,
-                    clientName = clientNames.TryGetValue(r.ClientId, out var name) ? name : "Client",
-                    daysRemaining = (int)Math.Ceiling((r.renewalDate - nowDate).TotalDays)
-                });
+                    x.ClientId,
+                    clientName = clientNames.TryGetValue(x.ClientId, out var name) ? name : "Client",
+                    x.planId,
+                    x.planName,
+                    x.planType,
+                    x.renewalDate
+                })
+                .OrderBy(x => x.renewalDate)
+                .Take(10)
+                .ToList();
 
             var complianceSamples = await db.CheckIns
                 .AsNoTracking()
-                .Where(c => c.CoachId == coachId && c.DietCompliance.HasValue)
+                .Where(c => c.CoachId == coachId &&
+                            c.Type == CheckInType.Diet &&
+                            c.DietCompliance != null &&
+                            activeClientIds.Contains(c.ClientId))
                 .OrderByDescending(c => c.SubmittedAt)
+                .Select(c => (double)c.DietCompliance!.Value)
                 .Take(12)
-                .Select(c => c.DietCompliance!.Value)
                 .ToListAsync();
 
-            var averageCompliance = complianceSamples.Any()
-                ? Math.Round(complianceSamples.Average(), 1)
-                : 0;
-
+            var averageCompliance = complianceSamples.Any() ? complianceSamples.Average() : 0.0;
             var recentCompliance = complianceSamples.Take(6).ToList();
             var previousCompliance = complianceSamples.Skip(6).ToList();
             var recentAverage = recentCompliance.Any() ? recentCompliance.Average() : averageCompliance;
@@ -134,9 +134,9 @@ public static class DashboardEndpoints
             {
                 totalClients,
                 activeClients,
-                pendingCheckIns = await pendingCheckInsTask,
-                workoutPlansCreated = await workoutPlansCreatedTask,
-                dietPlansCreated = await dietPlansCreatedTask,
+                pendingCheckIns,
+                workoutPlansCreated,
+                dietPlansCreated,
                 attentionItems = attentionItems.Select(c => new
                 {
                     c.ClientId,
@@ -152,29 +152,56 @@ public static class DashboardEndpoints
 
         group.MapGet("/client", [Authorize(Roles = "client")] async (ClaimsPrincipal principal, AppDbContext db) =>
         {
-            var idStr = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub");
-            if (idStr is null || !Guid.TryParse(idStr, out var uid))
+            var clientIdStr = principal.FindFirstValue(ClaimTypes.NameIdentifier) ?? principal.FindFirstValue("sub");
+            if (clientIdStr is null || !Guid.TryParse(clientIdStr, out var clientId))
                 return Results.Unauthorized();
 
-            var user = await db.Users.Include(u => u.Profile).FirstOrDefaultAsync(u => u.Id == uid);
-            if (user is null) return Results.Unauthorized();
+            var today = DateTime.UtcNow.Date;
 
-            var p = user.Profile;
+            var activeWorkout = await db.ClientWorkoutPlans
+                .AsNoTracking()
+                .Include(x => x.WorkoutPlan)
+                .Where(x => x.ClientId == clientId && x.IsActive)
+                .OrderByDescending(x => x.StartDate)
+                .FirstOrDefaultAsync();
 
-            var currentWeight = (double)(p?.CurrentWeight ?? 0);
-            var startWeight = (double)(p?.StartWeight ?? p?.CurrentWeight ?? 0);
-            var weightChange = currentWeight - startWeight;
+            var activeDiet = await db.ClientDietPlans
+                .AsNoTracking()
+                .Include(x => x.DietPlan)
+                .Where(x => x.ClientId == clientId && x.IsActive)
+                .OrderByDescending(x => x.StartDate)
+                .FirstOrDefaultAsync();
 
-            var startDate = p?.StartDate ?? DateTime.UtcNow.Date;
-            var daysOnPlan = (int)Math.Max(0, (DateTime.UtcNow.Date - startDate.Date).TotalDays);
+            var lastCheckIn = await db.CheckIns
+                .AsNoTracking()
+                .Where(x => x.ClientId == clientId)
+                .OrderByDescending(x => x.SubmittedAt)
+                .FirstOrDefaultAsync();
 
             return Results.Ok(new
             {
-                currentWeight,
-                weightChange,
-                workoutsCompleted = 0,
-                dietComplianceAverage = 0,
-                daysOnPlan
+                activeWorkout = activeWorkout == null ? null : new
+                {
+                    planId = activeWorkout.WorkoutPlanId,
+                    planName = activeWorkout.WorkoutPlan != null ? activeWorkout.WorkoutPlan.Name : "Workout Plan",
+                    startDate = activeWorkout.StartDate,
+                    endDate = activeWorkout.EndDate
+                },
+                activeDiet = activeDiet == null ? null : new
+                {
+                    planId = activeDiet.DietPlanId,
+                    planName = activeDiet.DietPlan != null ? activeDiet.DietPlan.Name : "Diet Plan",
+                    startDate = activeDiet.StartDate,
+                    endDate = activeDiet.EndDate
+                },
+                lastCheckIn = lastCheckIn == null ? null : new
+                {
+                    lastCheckIn.Id,
+                    lastCheckIn.Type,
+                    lastCheckIn.Status,
+                    lastCheckIn.SubmittedAt
+                },
+                today
             });
         });
     }

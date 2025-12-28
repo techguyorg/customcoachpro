@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text;
 using System.Threading.Channels;
 using FitCoachPro.Api.Auth;
@@ -51,6 +52,7 @@ builder.Services.AddHostedService<NotificationWorker>();
 // ✅ DB selection: SQL if available, else InMemory
 var sqlConn = builder.Configuration.GetConnectionString("SqlConnection")
              ?? builder.Configuration.GetConnectionString("DefaultConnection");
+
 if (!string.IsNullOrWhiteSpace(sqlConn))
 {
     builder.Services.AddDbContext<AppDbContext>(opt => opt.UseSqlServer(sqlConn));
@@ -118,22 +120,55 @@ app.UseCors("cors");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// ✅ Apply migrations automatically when using SQL Server
+// ✅ Apply migrations automatically when using SQL Server,
+// but fall back to EnsureCreated() when tables don't exist (missing initial migration scenario)
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-    // If SQL Server is used, apply migrations (or create schema if none exist)
-    var hasMigrations = db.Database.GetMigrations().Any();
     if (!string.IsNullOrWhiteSpace(sqlConn))
     {
-        if (hasMigrations)
+        // If Users table doesn't exist, the DB is not initialized.
+        // This repo currently has additive migrations but no initial "create tables" migration,
+        // so Migrate() alone may not create the schema for a new database.
+        var usersTableExists = false;
+
+        try
         {
-            db.Database.Migrate();
+            var conn = db.Database.GetDbConnection();
+            if (conn.State != ConnectionState.Open) conn.Open();
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT OBJECT_ID(N'[dbo].[Users]', N'U')";
+            var result = cmd.ExecuteScalar();
+
+            usersTableExists = result != null && result != DBNull.Value;
+
+            conn.Close();
+        }
+        catch
+        {
+            // If we can't check, we'll let EF try to initialize normally below.
+            usersTableExists = false;
+        }
+
+        if (!usersTableExists)
+        {
+            // Create schema from current model so seeding can run.
+            db.Database.EnsureCreated();
         }
         else
         {
-            db.Database.EnsureCreated();
+            // Normal path: keep migrations working for existing DBs.
+            var hasMigrations = db.Database.GetMigrations().Any();
+            if (hasMigrations)
+            {
+                db.Database.Migrate();
+            }
+            else
+            {
+                db.Database.EnsureCreated();
+            }
         }
     }
 
