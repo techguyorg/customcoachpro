@@ -1,156 +1,123 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
-import type { User } from '@/types';
-import authService from '@/services/authService';
-import apiService from '@/services/api';
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { auth, User } from "@/lib/api";
 
-const REFRESH_BUFFER_MS = 60_000;
+type AppRole = "client" | "coach" | "super_admin";
 
-function getTokenExpiry(token: string | null): number | null {
-  if (!token) return null;
-  const parts = token.split('.');
-  if (parts.length < 2) return null;
+interface AuthUser extends User {
+  role?: AppRole;
+}
 
-  try {
-    const payload = JSON.parse(atob(parts[1]));
-    return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
-  } catch {
-    return null;
-  }
+interface SignUpData {
+  email: string;
+  password: string;
+  fullName: string;
+  role: AppRole;
+}
+
+interface SignInData {
+  email: string;
+  password: string;
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   isLoading: boolean;
-  isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<User>;
-  register: (email: string, password: string, firstName: string, lastName: string, role: 'coach' | 'client') => Promise<void>;
-  logout: () => Promise<void>;
+  signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
+  signIn: (data: SignInData) => Promise<{ error: Error | null }>;
+  signInWithGoogle: (code: string, role?: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<void>;
+  hasRole: (role: AppRole) => boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const refreshTimeoutRef = useRef<number | null>(null);
-
-  const clearScheduledRefresh = useCallback(() => {
-    if (refreshTimeoutRef.current) {
-      window.clearTimeout(refreshTimeoutRef.current);
-      refreshTimeoutRef.current = null;
-    }
-  }, []);
-
-  const handleLogout = useCallback(async () => {
-    clearScheduledRefresh();
-    await authService.logout();
-    setUser(null);
-    window.location.href = '/login';
-  }, [clearScheduledRefresh]);
-
-  const performRefresh = useCallback(async (): Promise<string | null> => {
-    try {
-      const response = await authService.refreshToken();
-      if (response.user) {
-        setUser(response.user);
-      }
-      return response.token;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const scheduleBackgroundRefresh = useCallback(
-    (token: string | null) => {
-      clearScheduledRefresh();
-
-      const expiresAt = getTokenExpiry(token);
-      if (!expiresAt) return;
-
-      const delay = Math.max(expiresAt - Date.now() - REFRESH_BUFFER_MS, 0);
-
-      refreshTimeoutRef.current = window.setTimeout(async () => {
-        const refreshedToken = await performRefresh();
-        if (refreshedToken) {
-          scheduleBackgroundRefresh(refreshedToken);
-          return;
-        }
-
-        await handleLogout();
-      }, delay);
-    },
-    [clearScheduledRefresh, performRefresh, handleLogout]
-  );
 
   useEffect(() => {
-    apiService.setRefreshHandler(async () => {
-      const refreshedToken = await performRefresh();
-      if (refreshedToken) {
-        scheduleBackgroundRefresh(refreshedToken);
-      }
-      return refreshedToken;
-    });
-
-    apiService.setLogoutHandler(handleLogout);
-  }, [handleLogout, performRefresh, scheduleBackgroundRefresh]);
-
-  useEffect(() => {
-    const init = async () => {
-      const storedUser = authService.getStoredUser();
-      const token = localStorage.getItem('auth_token');
-
-      if (storedUser && token) {
-        setUser(storedUser);
-        scheduleBackgroundRefresh(token);
+    const initAuth = async () => {
+      if (auth.isAuthenticated()) {
         try {
-          const me = await authService.getCurrentUser();
-          setUser(me);
+          const userData = await auth.getMe();
+          setUser({
+            ...userData,
+            role: userData.roles[0] as AppRole,
+          });
         } catch {
-          await handleLogout();
+          auth.clearTokens();
         }
       }
-
       setIsLoading(false);
     };
 
-    init();
-    return () => {
-      clearScheduledRefresh();
-    };
-  }, [clearScheduledRefresh, handleLogout, scheduleBackgroundRefresh]);
+    initAuth();
+  }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const response = await authService.login({ email, password });
-    setUser(response.user);
-    scheduleBackgroundRefresh(response.token);
-    return response.user;
-  }, [scheduleBackgroundRefresh]);
+  const signUp = async (data: SignUpData) => {
+    try {
+      const response = await auth.signup(data.email, data.password, data.fullName, data.role as "client" | "coach");
+      setUser({
+        ...response.user,
+        role: response.user.roles[0] as AppRole,
+      });
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
 
-  const register = useCallback(async (
-    email: string,
-    password: string,
-    firstName: string,
-    lastName: string,
-    role: 'coach' | 'client'
-  ) => {
-    const response = await authService.register({ email, password, firstName, lastName, role });
-    setUser(response.user);
-    scheduleBackgroundRefresh(response.token);
-  }, [scheduleBackgroundRefresh]);
+  const signIn = async (data: SignInData) => {
+    try {
+      const response = await auth.login(data.email, data.password);
+      setUser({
+        ...response.user,
+        role: response.user.roles[0] as AppRole,
+      });
+      return { error: null };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
 
-  const logout = useCallback(async () => {
-    await handleLogout();
-  }, [handleLogout]);
+  const signInWithGoogle = async (_code: string, _role?: string) => {
+    // Google OAuth will be handled separately
+    return { error: new Error("Google OAuth not yet implemented") };
+  };
+
+  const signOut = async () => {
+    await auth.logout();
+    setUser(null);
+  };
+
+  const hasRole = (role: AppRole) => {
+    return user?.role === role || user?.roles?.includes(role) || false;
+  };
+
+  const refreshUser = async () => {
+    try {
+      const userData = await auth.getMe();
+      setUser({
+        ...userData,
+        role: userData.roles[0] as AppRole,
+      });
+    } catch {
+      // Ignore errors
+    }
+  };
 
   return (
     <AuthContext.Provider
       value={{
         user,
         isLoading,
-        isAuthenticated: !!user,
-        login,
-        register,
-        logout,
+        signUp,
+        signIn,
+        signInWithGoogle,
+        signOut,
+        hasRole,
+        refreshUser,
       }}
     >
       {children}
@@ -161,7 +128,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 }
+
+export type { AppRole, AuthUser };

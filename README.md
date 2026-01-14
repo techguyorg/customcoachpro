@@ -1,73 +1,75 @@
-# Welcome to your Lovable project
+# CustomCoachPro
 
-## Project info
+A comprehensive fitness platform for coaches and clients.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+**Owner:** Susheel Bhatt  
+**Contact:** s.susheel9@gmail.com
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## Quick Start
 
-**Use Lovable**
+```bash
+# Install dependencies
+npm install
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
+
+# Build for production
+npm run build
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Documentation
 
-**Use GitHub Codespaces**
+Complete documentation is available in the `/docs` folder:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- [📖 Documentation Index](./docs/README.md)
+- [🏗️ Architecture](./docs/architecture.md)
+- [🗄️ Database Schema](./docs/database-schema.md)
+- [📁 Folder Structure](./docs/folder-structure.md)
+- [🧩 Components Guide](./docs/components-guide.md)
+- [🪝 Hooks Reference](./docs/hooks-reference.md)
+- [⚡ Edge Functions](./docs/edge-functions.md)
+- [🚀 Deployment Guide](./docs/deployment-guide.md)
+- [⚙️ Configuration Guide](./docs/configuration-guide.md)
+- [🔒 Security & RLS](./docs/security-rls.md)
+- [🔧 Troubleshooting](./docs/troubleshooting.md)
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## Technology Stack
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, TypeScript, Vite |
+| Styling | Tailwind CSS, shadcn/ui |
+| State | TanStack Query |
+| Backend | Supabase (PostgreSQL) |
+| Storage | Azure Blob Storage |
+| Email | Resend API |
+| CI/CD | Azure DevOps |
 
-## How can I deploy this project?
+---
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## Project Structure
 
-## Can I connect a custom domain to my Lovable project?
+```
+├── src/
+│   ├── components/    # React components
+│   ├── hooks/         # Custom hooks
+│   ├── pages/         # Page components
+│   ├── contexts/      # React contexts
+│   └── lib/           # Utilities
+├── supabase/
+│   ├── functions/     # Edge functions
+│   └── migrations/    # Database migrations
+├── docs/              # Documentation
+└── .azure/            # Azure DevOps configs
+```
 
-Yes, you can!
+---
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+*For questions, contact Susheel Bhatt at s.susheel9@gmail.com*

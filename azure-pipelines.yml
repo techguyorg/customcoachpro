@@ -1,0 +1,198 @@
+# Azure DevOps Pipeline for CustomCoachPro
+# Deploys React frontend + Express.js backend to Azure App Services
+# 
+# BEFORE RUNNING:
+# 1. Create App Service for backend: customcoachpro-api (Node.js 20 LTS, Windows)
+# 2. Configure App Settings in Azure Portal for customcoachpro-api:
+#    - SQL_USER, SQL_PASSWORD, JWT_SECRET, GOOGLE_APP_PASSWORD
+# 3. Create pipeline variable: AZURE_SERVICE_CONNECTION (your service connection name)
+
+trigger:
+  branches:
+    include:
+      - main
+
+pr:
+  branches:
+    include:
+      - main
+
+pool:
+  name: Default
+  demands:
+    - Agent.Name -equals ubuntu-pipeline-agent
+
+variables:
+  - name: nodeVersion
+    value: '20.x'
+  - name: AZURE_SERVICE_CONNECTION
+    value: 'ccp-ado-service-Custom Coach Pro'  # Replace with your actual service connection
+
+stages:
+  # =========================================
+  # BUILD STAGE
+  # =========================================
+  - stage: Build
+    displayName: 'Build Stage'
+    jobs:
+      # BUILD FRONTEND
+      - job: BuildFrontend
+        displayName: 'Build React Frontend'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(nodeVersion)
+            displayName: 'Install Node.js'
+
+          - script: npm ci --include=dev
+            displayName: 'Install dependencies'
+
+          - script: npm run build
+            displayName: 'Build application'
+
+          # Copy web.config into dist for IIS
+          - task: CopyFiles@2
+            inputs:
+              sourceFolder: 'public'
+              contents: 'web.config'
+              targetFolder: 'dist'
+            displayName: 'Copy web.config to dist'
+
+          # Create deploy folder and zip
+          - script: |
+              mkdir -p frontend-deploy
+              cp -R dist frontend-deploy/
+              cp package.json frontend-deploy/
+              cp package-lock.json frontend-deploy/ 2>/dev/null || true
+              cp server.js frontend-deploy/
+
+              cd frontend-deploy
+              npm ci --omit=dev
+
+              ls -la
+
+              echo "===== DEPLOY FOLDER CONTENT ====="
+              ls -la .
+            displayName: 'Prepare frontend deploy folder'
+
+          - script: |
+              cd frontend-deploy
+              zip -r $(Build.ArtifactStagingDirectory)/frontend.zip .
+            displayName: 'Archive frontend'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/frontend.zip'
+              artifactName: 'frontend'
+            displayName: 'Publish frontend artifact'
+
+      # BUILD BACKEND (Express.js)
+      - job: BuildBackend
+        displayName: 'Build Express.js Backend'
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: $(nodeVersion)
+            displayName: 'Install Node.js'
+
+          - script: |
+              cd backend
+              npm ci --include=dev
+            displayName: 'Install dependencies'
+
+          - script: |
+              cd backend
+              npm run build
+            displayName: 'Build TypeScript'
+
+          # Create deploy folder with only needed files
+          - script: |
+              mkdir -p backend-deploy
+              cp -R backend/dist backend-deploy/
+              cp backend/package.json backend-deploy/
+              cp backend/package-lock.json backend-deploy/ 2>/dev/null || true
+              cp backend/web.config backend-deploy/
+              
+              # Install production dependencies in deploy folder
+              cd backend-deploy
+              npm ci --omit=dev
+              
+              echo "===== BACKEND DEPLOY FOLDER ====="
+              ls -la
+            displayName: 'Prepare backend deploy folder'
+
+          - script: |
+              cd backend-deploy
+              zip -r $(Build.ArtifactStagingDirectory)/backend.zip .
+            displayName: 'Archive backend'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              pathToPublish: '$(Build.ArtifactStagingDirectory)/backend.zip'
+              artifactName: 'backend'
+            displayName: 'Publish backend artifact'
+
+  # =========================================
+  # DEPLOY TO PRODUCTION
+  # =========================================
+  - stage: DeployProd
+    displayName: 'Deploy to Production'
+    dependsOn: Build
+    # condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      # DEPLOY BACKEND FIRST
+      - deployment: DeployBackend
+        displayName: 'Deploy Backend API'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: backend
+
+                # Configure App Settings (secrets)
+                - task: AzureCLI@2
+                  displayName: 'Configure Backend App Settings'
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    inlineScript: |
+                      az webapp config appsettings set \
+                        --name customcoachpro-api \
+                        --resource-group rg-customer-coach-pro-prod \
+                        --settings \
+                        "SQL_USER=$(SQL_USER)" \
+                        "SQL_PASSWORD=$(SQL_PASSWORD)" \
+                        "JWT_SECRET=$(JWT_SECRET)" \
+                        "GOOGLE_APP_PASSWORD=$(GOOGLE_APP_PASSWORD)" \
+                        "WEBSITE_NODE_DEFAULT_VERSION=~20"
+
+                - task: AzureWebApp@1
+                  displayName: 'Deploy Backend App Service'
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    appType: 'webApp'
+                    appName: 'customcoachpro-api'
+                    package: '$(Pipeline.Workspace)/backend/backend.zip'
+
+      # DEPLOY FRONTEND AFTER BACKEND
+      - deployment: DeployFrontend
+        displayName: 'Deploy Frontend'
+        environment: 'production'
+        dependsOn: DeployBackend
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: frontend
+
+                - task: AzureWebApp@1
+                  displayName: 'Deploy Frontend App Service'
+                  inputs:
+                    azureSubscription: $(AZURE_SERVICE_CONNECTION)
+                    appType: 'webApp'
+                    appName: 'customcoachpro'
+                    package: '$(Pipeline.Workspace)/frontend/frontend.zip'
