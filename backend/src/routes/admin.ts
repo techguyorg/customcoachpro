@@ -740,10 +740,15 @@ router.post('/data-integrity/repair-profiles', authenticate, requireSuperAdmin, 
   }
 
   // Log the repair action
-  await logAuditEvent(req.user!.id, AUDIT_ACTIONS.ADMIN_ACTION, 'data_integrity', null, {
-    action: 'repair_missing_profiles',
-    repairedCount,
-    errorCount: errors.length,
+  await logAuditEvent({
+    adminUserId: req.user!.id,
+    actionType: AUDIT_ACTIONS.ADMIN_ACTION,
+    targetResourceType: 'data_integrity',
+    details: {
+      action: 'repair_missing_profiles',
+      repairedCount,
+      errorCount: errors.length,
+    },
   });
 
   res.json({

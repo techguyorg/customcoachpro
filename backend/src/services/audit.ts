@@ -77,6 +77,9 @@ export const AUDIT_ACTIONS = {
   
   // Impersonation
   USER_IMPERSONATED: 'USER_IMPERSONATED',
+  
+  // Admin actions
+  ADMIN_ACTION: 'ADMIN_ACTION',
 } as const;
 
 export type AuditAction = typeof AUDIT_ACTIONS[keyof typeof AUDIT_ACTIONS];
