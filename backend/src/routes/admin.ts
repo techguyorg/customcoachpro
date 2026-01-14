@@ -742,13 +742,15 @@ router.post('/data-integrity/repair-profiles', authenticate, requireSuperAdmin, 
   // Log the repair action
   await logAuditEvent({
     adminUserId: req.user!.id,
-    actionType: AUDIT_ACTIONS.ADMIN_ACTION,
+    // Keep builds stable even if AUDIT_ACTIONS is missing this constant in some branches
+    actionType: (AUDIT_ACTIONS as Record<string, string>).ADMIN_ACTION ?? 'ADMIN_ACTION',
     targetResourceType: 'data_integrity',
     details: {
       action: 'repair_missing_profiles',
       repairedCount,
       errorCount: errors.length,
     },
+    ipAddress: req.ip,
   });
 
   res.json({

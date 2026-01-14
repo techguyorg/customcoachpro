@@ -14,7 +14,35 @@ export interface AuditLogEntry {
 /**
  * Log an administrative action for audit purposes
  */
-export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
+export async function logAuditEvent(entry: AuditLogEntry): Promise<void>;
+// Backwards-compatible signature (older code passed positional args)
+export async function logAuditEvent(
+  adminUserId: string,
+  actionType: string,
+  targetResourceType?: string | null,
+  targetResourceId?: string | null,
+  details?: Record<string, unknown> | null,
+  targetUserId?: string | null,
+  ipAddress?: string | null
+): Promise<void>;
+
+/**
+ * Log an administrative action for audit purposes
+ */
+export async function logAuditEvent(...args: unknown[]): Promise<void> {
+  const entry: AuditLogEntry =
+    typeof args[0] === 'object' && args[0] !== null
+      ? (args[0] as AuditLogEntry)
+      : {
+          adminUserId: String(args[0] ?? ''),
+          actionType: String(args[1] ?? ''),
+          targetResourceType: (args[2] as string | null | undefined) ?? null,
+          targetResourceId: (args[3] as string | null | undefined) ?? null,
+          details: (args[4] as Record<string, unknown> | null | undefined) ?? null,
+          targetUserId: (args[5] as string | null | undefined) ?? null,
+          ipAddress: (args[6] as string | null | undefined) ?? null,
+        };
+
   try {
     await execute(
       `INSERT INTO admin_audit_logs 
@@ -28,7 +56,7 @@ export async function logAuditEvent(entry: AuditLogEntry): Promise<void> {
         targetResourceType: entry.targetResourceType || null,
         targetResourceId: entry.targetResourceId || null,
         details: entry.details ? JSON.stringify(entry.details) : null,
-        ipAddress: entry.ipAddress || null
+        ipAddress: entry.ipAddress || null,
       }
     );
     console.log(`Audit log: ${entry.actionType} by ${entry.adminUserId}`);
