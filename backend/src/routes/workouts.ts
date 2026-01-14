@@ -1007,9 +1007,11 @@ router.get('/logs/:id', authenticate, asyncHandler(async (req: AuthenticatedRequ
   const { id } = req.params;
 
   const log = await queryOne<Record<string, unknown>>(
-    `SELECT wl.*, wt.name as template_name
+    `SELECT wl.*, wt.name as template_name, wt.id as wt_id, wt.description as template_description,
+            td.name as template_day_name, td.day_number as template_day_number
      FROM workout_logs wl
      LEFT JOIN workout_templates wt ON wl.template_id = wt.id
+     LEFT JOIN template_days td ON wl.template_day_id = td.id
      WHERE wl.id = @id`,
     { id }
   );
@@ -1045,12 +1047,40 @@ router.get('/logs/:id', authenticate, asyncHandler(async (req: AuthenticatedRequ
     { logId: id }
   );
 
-  transformRows(exercises, ['set_data']);
+  // Ensure set_data is always an array
+  transformRows(exercises, [], ['set_data']);
   (log as Record<string, unknown>).exercises = exercises;
+  
+  // Build nested workout_template and template_day objects for frontend compatibility
+  if (log.wt_id) {
+    (log as Record<string, unknown>).workout_template = {
+      id: log.wt_id,
+      name: log.template_name,
+      description: log.template_description,
+    };
+  } else {
+    (log as Record<string, unknown>).workout_template = null;
+  }
+  
+  if (log.template_day_id) {
+    (log as Record<string, unknown>).template_day = {
+      id: log.template_day_id,
+      name: log.template_day_name,
+      day_number: log.template_day_number,
+    };
+  } else {
+    (log as Record<string, unknown>).template_day = null;
+  }
+  
+  // Clean up flat fields that are now nested
+  delete (log as Record<string, unknown>).wt_id;
+  delete (log as Record<string, unknown>).template_name;
+  delete (log as Record<string, unknown>).template_description;
+  delete (log as Record<string, unknown>).template_day_name;
+  delete (log as Record<string, unknown>).template_day_number;
 
   res.json(log);
 }));
-
 /**
  * @swagger
  * /api/workouts/logs:
