@@ -66,11 +66,15 @@ export default function ActiveWorkoutPage() {
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [showFinishDialog, setShowFinishDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showSetupExercise, setShowSetupExercise] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<{ id: string; name: string } | null>(null);
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
   const [finishNotes, setFinishNotes] = useState("");
   const [perceivedEffort, setPerceivedEffort] = useState([5]);
   const [satisfaction, setSatisfaction] = useState([3]);
+  const [newExerciseSets, setNewExerciseSets] = useState(3);
+  const [newExerciseReps, setNewExerciseReps] = useState(10);
 
   // Timer
   useEffect(() => {
@@ -95,17 +99,35 @@ export default function ActiveWorkoutPage() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleAddExercise = async (exerciseId: string, exerciseName: string) => {
-    if (!logId) return;
+  const handleSelectExercise = (exerciseId: string, exerciseName: string) => {
+    setSelectedExercise({ id: exerciseId, name: exerciseName });
+    setShowAddExercise(false);
+    setShowSetupExercise(true);
+    setNewExerciseSets(3);
+    setNewExerciseReps(10);
+  };
+
+  const handleConfirmAddExercise = async () => {
+    if (!logId || !selectedExercise) return;
+    
+    // Build set_data array based on user inputs
+    const setData = Array.from({ length: newExerciseSets }, (_, i) => ({
+      setNumber: i + 1,
+      reps: newExerciseReps,
+      weight: 0,
+      completed: false,
+    }));
     
     try {
       await addWorkoutExercise.mutateAsync({
         workoutLogId: logId,
-        exerciseId,
-        exerciseName,
+        exerciseId: selectedExercise.id,
+        exerciseName: selectedExercise.name,
         orderIndex: workoutLog?.exercises?.length || 0,
+        setData,
       });
-      setShowAddExercise(false);
+      setShowSetupExercise(false);
+      setSelectedExercise(null);
       setExerciseSearch("");
       toast({ title: "Exercise added" });
     } catch (error) {
@@ -450,7 +472,7 @@ export default function ActiveWorkoutPage() {
                   <Card 
                     key={exercise.id}
                     className="cursor-pointer hover:border-primary transition-colors"
-                    onClick={() => handleAddExercise(exercise.id, exercise.name)}
+                    onClick={() => handleSelectExercise(exercise.id, exercise.name)}
                   >
                     <CardContent className="p-3">
                       <p className="font-medium text-sm">{exercise.name}</p>
@@ -463,6 +485,50 @@ export default function ActiveWorkoutPage() {
               </div>
             </ScrollArea>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Setup Exercise Dialog - Sets & Reps */}
+      <Dialog open={showSetupExercise} onOpenChange={setShowSetupExercise}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Configure Exercise</DialogTitle>
+            <DialogDescription>
+              {selectedExercise?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="sets">Number of Sets</Label>
+              <Input
+                id="sets"
+                type="number"
+                min={1}
+                max={20}
+                value={newExerciseSets}
+                onChange={(e) => setNewExerciseSets(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reps">Reps per Set</Label>
+              <Input
+                id="reps"
+                type="number"
+                min={1}
+                max={100}
+                value={newExerciseReps}
+                onChange={(e) => setNewExerciseReps(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSetupExercise(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmAddExercise} disabled={addWorkoutExercise.isPending}>
+              {addWorkoutExercise.isPending ? "Adding..." : "Add Exercise"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

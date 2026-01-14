@@ -163,16 +163,19 @@ export function useAddWorkoutExercise() {
       exerciseId,
       exerciseName,
       orderIndex,
+      setData,
     }: {
       workoutLogId: string;
       exerciseId?: string;
       exerciseName: string;
       orderIndex: number;
+      setData?: SetData[];
     }) => {
       const data = await api.post(`/api/workouts/logs/${workoutLogId}/exercises`, {
         exerciseId,
         exerciseName,
         orderIndex,
+        setData,
       });
       return data;
     },
