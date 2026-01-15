@@ -1,15 +1,14 @@
 import { useState, useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Trash2, Flame, Beef, Wheat, Droplet, ChevronLeft, ChevronRight, Check, Loader2, Clock, Search, Apple, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Flame, Beef, Wheat, Droplet, ChevronLeft, ChevronRight, Check, Loader2, Clock, Apple, AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -33,8 +32,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCreateDietPlan, useUpdateDietPlan, useDietPlanWithMeals, DietPlan } from "@/hooks/useDietPlans";
-import { useFoods, calculateNutrition, Food } from "@/hooks/useFoods";
-import { CustomFoodDialog } from "./CustomFoodDialog";
+import { calculateNutrition, Food } from "@/hooks/useFoods";
+import { FoodPickerDialog } from "./FoodPickerDialog";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -96,15 +95,9 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
   const [meals, setMeals] = useState<MealData[]>([]);
   const [selectedMeal, setSelectedMeal] = useState(0);
   const [showFoodPicker, setShowFoodPicker] = useState(false);
-  const [foodSearch, setFoodSearch] = useState("");
-  const [selectedFood, setSelectedFood] = useState<Food | null>(null);
-  const [foodQuantity, setFoodQuantity] = useState(100);
-  const [foodUnit, setFoodUnit] = useState("g");
   
   const createMutation = useCreateDietPlan();
   const updateMutation = useUpdateDietPlan();
-  
-  const { data: searchedFoods } = useFoods(foodSearch);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -228,8 +221,6 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
     setMeals([]);
     setSelectedMeal(0);
     setShowFoodPicker(false);
-    setFoodSearch("");
-    setSelectedFood(null);
     form.reset();
     onOpenChange(false);
   };
@@ -246,18 +237,18 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
     if (step > 1) setStep(step - 1);
   };
 
-  const addFoodToMeal = (foodToAdd?: Food) => {
-    const food = foodToAdd || selectedFood;
-    if (!food) return;
-    
-    const nutrition = calculateNutrition(food, foodQuantity, foodUnit);
-    
+  const handleFoodAdded = (
+    food: Food,
+    quantity: number,
+    unit: string,
+    nutrition: { calories: number; protein: number; carbs: number; fat: number }
+  ) => {
     setMeals(prev => {
       const newMeals = [...prev];
       newMeals[selectedMeal].foods.push({
-        food: food,
-        quantity: foodQuantity,
-        unit: foodUnit,
+        food,
+        quantity,
+        unit,
         calories: nutrition.calories,
         protein: nutrition.protein,
         carbs: nutrition.carbs,
@@ -265,32 +256,7 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
       });
       return newMeals;
     });
-    
-    setShowFoodPicker(false);
-    setSelectedFood(null);
-    setFoodSearch("");
-    setFoodQuantity(100);
-    setFoodUnit("g");
-  };
-
-  const handleCustomFoodCreated = (food: Food) => {
-    // Add the custom food directly to the meal
-    const nutrition = calculateNutrition(food, food.default_serving_size || 100, food.default_serving_unit || "g");
-    setMeals(prev => {
-      const newMeals = [...prev];
-      newMeals[selectedMeal].foods.push({
-        food: food,
-        quantity: food.default_serving_size || 100,
-        unit: food.default_serving_unit || "g",
-        calories: nutrition.calories,
-        protein: nutrition.protein,
-        carbs: nutrition.carbs,
-        fat: nutrition.fat,
-      });
-      return newMeals;
-    });
-    setShowFoodPicker(false);
-    toast.success("Custom food added to meal");
+    toast.success(`${food.name} added to meal`);
   };
 
   const removeFoodFromMeal = (mealIdx: number, foodIdx: number) => {
@@ -834,158 +800,13 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
                           Add Food
                         </Button>
 
-                        {/* Food Picker */}
-                        {showFoodPicker && (
-                          <Card className="mt-4 border-2 border-primary">
-                            <CardHeader className="py-3 px-4">
-                              <CardTitle className="text-base">Add Food</CardTitle>
-                            </CardHeader>
-                            <CardContent className="pt-0 px-4 pb-4">
-                              <div className="relative mb-4">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  placeholder="Search foods..."
-                                  value={foodSearch}
-                                  onChange={(e) => setFoodSearch(e.target.value)}
-                                  className="pl-9"
-                                />
-                              </div>
-
-                              {!selectedFood ? (
-                                <ScrollArea className="h-48">
-                                  <div className="space-y-1">
-                                    {searchedFoods?.map((food) => (
-                                      <Button
-                                        key={food.id}
-                                        type="button"
-                                        variant="ghost"
-                                        className="w-full justify-start h-auto py-2"
-                                        onClick={() => {
-                                          setSelectedFood(food);
-                                          setFoodUnit(food.default_serving_unit || "g");
-                                          setFoodQuantity(food.default_serving_size || 100);
-                                        }}
-                                      >
-                                        <Apple className="w-4 h-4 mr-2 text-muted-foreground" />
-                                        <span className="flex-1 text-left">{food.name}</span>
-                                        <span className="text-xs text-muted-foreground">
-                                          {food.calories_per_100g} kcal/100g
-                                        </span>
-                                      </Button>
-                                    ))}
-                                    {(!searchedFoods || searchedFoods.length === 0) && foodSearch.length >= 2 && (
-                                      <div className="text-center py-4">
-                                        <p className="text-sm text-muted-foreground mb-3">
-                                          No foods found for "{foodSearch}"
-                                        </p>
-                                        <CustomFoodDialog
-                                          onFoodCreated={handleCustomFoodCreated}
-                                          trigger={
-                                            <Button variant="outline" size="sm" className="gap-1">
-                                              <Plus className="h-3 w-3" />
-                                              Add "{foodSearch}" as custom food
-                                            </Button>
-                                          }
-                                        />
-                                      </div>
-                                    )}
-                                    {foodSearch.length < 2 && (
-                                      <div className="text-center py-4">
-                                        <p className="text-sm text-muted-foreground mb-3">
-                                          Type at least 2 characters to search
-                                        </p>
-                                        <CustomFoodDialog
-                                          onFoodCreated={handleCustomFoodCreated}
-                                          trigger={
-                                            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
-                                              <Plus className="h-3 w-3 mr-1" />
-                                              Or add a custom food
-                                            </Button>
-                                          }
-                                        />
-                                      </div>
-                                    )}
-                                  </div>
-                                </ScrollArea>
-                              ) : (
-                                <div className="space-y-4">
-                                  <div className="p-3 bg-muted/50 rounded-lg">
-                                    <p className="font-medium">{selectedFood.name}</p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {selectedFood.calories_per_100g} kcal • P: {selectedFood.protein_per_100g}g • C: {selectedFood.carbs_per_100g}g • F: {selectedFood.fat_per_100g}g per 100g
-                                    </p>
-                                  </div>
-
-                                  <div className="flex gap-3">
-                                    <div className="flex-1">
-                                      <label className="text-sm font-medium mb-1 block">Quantity</label>
-                                      <Input
-                                        type="number"
-                                        value={foodQuantity}
-                                        onChange={(e) => setFoodQuantity(parseFloat(e.target.value) || 0)}
-                                        min={0}
-                                      />
-                                    </div>
-                                    <div className="w-32">
-                                      <label className="text-sm font-medium mb-1 block">Unit</label>
-                                      <Select value={foodUnit} onValueChange={setFoodUnit}>
-                                        <SelectTrigger>
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="g">grams</SelectItem>
-                                          <SelectItem value="oz">ounces</SelectItem>
-                                          <SelectItem value="piece">piece</SelectItem>
-                                          <SelectItem value="serving">serving</SelectItem>
-                                          <SelectItem value="cup">cup</SelectItem>
-                                          <SelectItem value="tbsp">tablespoon</SelectItem>
-                                          <SelectItem value="tsp">teaspoon</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    </div>
-                                  </div>
-
-                                  {foodQuantity > 0 && (
-                                    <div className="p-3 bg-primary/10 rounded-lg">
-                                      {(() => {
-                                        const nutrition = calculateNutrition(selectedFood, foodQuantity, foodUnit);
-                                        return (
-                                          <p className="text-sm">
-                                            <strong>{nutrition.calories} kcal</strong> • P: {nutrition.protein}g • C: {nutrition.carbs}g • F: {nutrition.fat}g
-                                          </p>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="mt-4 flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setShowFoodPicker(false);
-                                    setSelectedFood(null);
-                                    setFoodSearch("");
-                                  }}
-                                >
-                                  Cancel
-                                </Button>
-                                {selectedFood && (
-                                  <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => addFoodToMeal()}
-                                  >
-                                    Add
-                                  </Button>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        )}
+                        {/* Food Picker Dialog */}
+                        <FoodPickerDialog
+                          open={showFoodPicker}
+                          onOpenChange={setShowFoodPicker}
+                          onFoodAdded={handleFoodAdded}
+                          mealName={meals[selectedMeal]?.name}
+                        />
                       </CardContent>
                     </Card>
                   )}
