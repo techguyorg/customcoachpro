@@ -64,6 +64,33 @@ router.get('/', optionalAuth, asyncHandler(async (req: AuthenticatedRequest, res
 
 /**
  * @swagger
+ * /api/foods/my-foods:
+ *   get:
+ *     tags: [Foods]
+ *     summary: Get custom foods created by the current user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200: { description: List of user's custom foods }
+ */
+router.get('/my-foods', authenticate, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const foods = await queryAll<Record<string, unknown>>(
+    `SELECT id, name, brand, category, subcategory, barcode,
+            calories_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g,
+            fiber_per_100g, sugar_per_100g, sodium_mg_per_100g,
+            default_serving_size, default_serving_unit, image_url, notes,
+            is_system, created_by, created_at
+     FROM foods 
+     WHERE created_by = @userId AND is_system = 0
+     ORDER BY name`,
+    { userId: req.user!.id }
+  );
+
+  res.json(foods);
+}));
+
+/**
+ * @swagger
  * /api/foods/{id}:
  *   get:
  *     tags: [Foods]
