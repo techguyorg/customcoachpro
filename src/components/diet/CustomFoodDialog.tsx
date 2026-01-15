@@ -176,16 +176,17 @@ export function CustomFoodDialog({ onFoodCreated, trigger, isSystemContent = fal
     }
 
     try {
+      // Ensure required numeric fields are never null - coerce to 0
       const food = await createMutation.mutateAsync({
         name: data.name,
         category: data.category,
-        protein_per_100g: protein_per_100g,
-        carbs_per_100g: carbs_per_100g,
-        fat_per_100g: fat_per_100g,
-        fiber_per_100g: fiber_per_100g,
-        calories_per_100g: calories_per_100g,
-        default_serving_size: data.default_serving_size,
-        default_serving_unit: data.default_serving_unit,
+        protein_per_100g: protein_per_100g ?? 0,
+        carbs_per_100g: carbs_per_100g ?? 0,
+        fat_per_100g: fat_per_100g ?? 0,
+        fiber_per_100g: fiber_per_100g ?? null,
+        calories_per_100g: calories_per_100g ?? 0,
+        default_serving_size: data.default_serving_size ?? 100,
+        default_serving_unit: data.default_serving_unit || 'g',
         subcategory: null,
         brand: null,
         barcode: null,
