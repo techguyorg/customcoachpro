@@ -762,21 +762,32 @@ function FoodsTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paginatedData.map((f) => (
-                    <TableRow key={f.id}>
-                      <TableCell className="font-medium">{f.name}</TableCell>
-                      <TableCell><Badge variant="outline" className="capitalize">{f.category}</Badge></TableCell>
-                      <TableCell>{f.calories_per_100g} /100g</TableCell>
-                      <TableCell>{f.protein_per_100g}g</TableCell>
-                      <TableCell>
-                        <ActionsMenu 
-                          onEdit={() => setEditingFood(f)}
-                          onDelete={() => deleteMutation.mutate(f.id)}
-                          itemName={f.name}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {paginatedData.map((f) => {
+                    const isPieceUnit = ['piece', 'serving', 'slice', 'scoop', 'cup', 'tbsp', 'tsp'].includes(f.default_serving_unit);
+                    const displayUnit = isPieceUnit ? `/${f.default_serving_unit}` : '/100g';
+                    return (
+                      <TableRow key={f.id}>
+                        <TableCell className="font-medium">{f.name}</TableCell>
+                        <TableCell><Badge variant="outline" className="capitalize">{f.category}</Badge></TableCell>
+                        <TableCell>
+                          {f.calories_per_100g} kcal{displayUnit}
+                          {isPieceUnit && f.default_serving_size && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({f.default_serving_size}g)
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>{f.protein_per_100g}g</TableCell>
+                        <TableCell>
+                          <ActionsMenu 
+                            onEdit={() => setEditingFood(f)}
+                            onDelete={() => deleteMutation.mutate(f.id)}
+                            itemName={f.name}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

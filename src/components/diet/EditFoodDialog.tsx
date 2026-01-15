@@ -33,6 +33,7 @@ import { toast } from "sonner";
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   category: z.string().min(1, "Category is required"),
+  serving_unit_type: z.enum(["weight", "piece"]),
   protein_per_100g: z.number().min(0).nullable(),
   carbs_per_100g: z.number().min(0).nullable(),
   fat_per_100g: z.number().min(0).nullable(),
@@ -40,6 +41,27 @@ const formSchema = z.object({
   default_serving_size: z.number().min(1).default(100),
   default_serving_unit: z.string().default("g"),
 });
+
+const SERVING_UNIT_TYPES = [
+  { value: "weight", label: "Weight-based (grams, oz)", description: "Macros per 100g" },
+  { value: "piece", label: "Piece/Serving", description: "Macros per piece or serving" },
+] as const;
+
+const PIECE_UNITS = [
+  { value: "piece", label: "Piece" },
+  { value: "serving", label: "Serving" },
+  { value: "slice", label: "Slice" },
+  { value: "cup", label: "Cup" },
+  { value: "tbsp", label: "Tablespoon" },
+  { value: "tsp", label: "Teaspoon" },
+  { value: "scoop", label: "Scoop" },
+];
+
+const WEIGHT_UNITS = [
+  { value: "g", label: "Grams" },
+  { value: "oz", label: "Ounces" },
+  { value: "ml", label: "Milliliters" },
+];
 
 type FormData = z.infer<typeof formSchema>;
 
@@ -72,6 +94,7 @@ export function EditFoodDialog({ food, open, onOpenChange }: Props) {
     defaultValues: {
       name: "",
       category: "",
+      serving_unit_type: "weight",
       protein_per_100g: null,
       carbs_per_100g: null,
       fat_per_100g: null,
@@ -81,11 +104,17 @@ export function EditFoodDialog({ food, open, onOpenChange }: Props) {
     },
   });
 
+  const servingUnitType = form.watch("serving_unit_type");
+
   useEffect(() => {
     if (food && open) {
+      // Determine if food is weight-based or piece-based
+      const isPieceUnit = ['piece', 'serving', 'slice', 'cup', 'tbsp', 'tsp', 'scoop'].includes(food.default_serving_unit || 'g');
+      
       form.reset({
         name: food.name,
         category: food.category || "",
+        serving_unit_type: isPieceUnit ? "piece" : "weight",
         protein_per_100g: food.protein_per_100g,
         carbs_per_100g: food.carbs_per_100g,
         fat_per_100g: food.fat_per_100g,
@@ -178,6 +207,53 @@ export function EditFoodDialog({ food, open, onOpenChange }: Props) {
               )}
             />
 
+            {/* Serving Unit Type Selection */}
+            <FormField
+              control={form.control}
+              name="serving_unit_type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Measurement Type</FormLabel>
+                  <Select 
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      // Set appropriate default unit when type changes
+                      if (value === "weight") {
+                        form.setValue("default_serving_unit", "g");
+                        form.setValue("default_serving_size", 100);
+                      } else {
+                        form.setValue("default_serving_unit", "piece");
+                        form.setValue("default_serving_size", 1);
+                      }
+                    }} 
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select measurement type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {SERVING_UNIT_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {servingUnitType === "weight" 
+                      ? "Enter macros per 100g - will be calculated for any serving size"
+                      : "Enter macros per single piece/serving"}
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <p className="text-sm text-muted-foreground mb-2">
+              Nutritional values {servingUnitType === "weight" ? "per 100g" : "per piece/serving"}
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <FormField
                 control={form.control}
@@ -302,11 +378,23 @@ export function EditFoodDialog({ food, open, onOpenChange }: Props) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="g">grams</SelectItem>
-                        <SelectItem value="ml">ml</SelectItem>
-                        <SelectItem value="oz">ounces</SelectItem>
-                        <SelectItem value="piece">piece</SelectItem>
-                        <SelectItem value="serving">serving</SelectItem>
+                        {servingUnitType === "weight" ? (
+                          <>
+                            {WEIGHT_UNITS.map((unit) => (
+                              <SelectItem key={unit.value} value={unit.value}>
+                                {unit.label}
+                              </SelectItem>
+                            ))}
+                          </>
+                        ) : (
+                          <>
+                            {PIECE_UNITS.map((unit) => (
+                              <SelectItem key={unit.value} value={unit.value}>
+                                {unit.label}
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
