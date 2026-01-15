@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Plus, Trash2, Flame, Beef, Wheat, Droplet, ChevronLeft, ChevronRight, Check, Loader2, Clock, Search, Apple } from "lucide-react";
+import { Plus, Trash2, Flame, Beef, Wheat, Droplet, ChevronLeft, ChevronRight, Check, Loader2, Clock, Search, Apple, AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -32,9 +32,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useCreateDietPlan, useUpdateDietPlan, DietPlan } from "@/hooks/useDietPlans";
+import { useCreateDietPlan, useUpdateDietPlan, useDietPlanWithMeals, DietPlan } from "@/hooks/useDietPlans";
 import { useFoods, calculateNutrition, Food } from "@/hooks/useFoods";
+import { CustomFoodDialog } from "./CustomFoodDialog";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 
 const STEPS = [
   { id: 1, title: "Basics", description: "Plan details" },
@@ -156,23 +159,69 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
     }
   }, [mealsPerDay]);
 
-  // Load editing plan data
+  // Fetch full plan with meals when editing
+  const { data: fullEditingPlan } = useDietPlanWithMeals(editingPlan?.id);
+
+  // Load editing plan data including meals with foods
   useEffect(() => {
-    if (editingPlan && open) {
+    const planToLoad = fullEditingPlan || editingPlan;
+    if (planToLoad && open) {
       form.reset({
-        name: editingPlan.name,
-        description: editingPlan.description || "",
-        goal: editingPlan.goal || "",
-        dietary_type: editingPlan.dietary_type || "standard",
-        calories_target: editingPlan.calories_target || 2000,
-        protein_grams: editingPlan.protein_grams || 150,
-        carbs_grams: editingPlan.carbs_grams || 200,
-        fat_grams: editingPlan.fat_grams || 70,
-        meals_per_day: editingPlan.meals_per_day || 4,
-        notes: editingPlan.notes || "",
+        name: planToLoad.name,
+        description: planToLoad.description || "",
+        goal: planToLoad.goal || "",
+        dietary_type: planToLoad.dietary_type || "standard",
+        calories_target: planToLoad.calories_target || 2000,
+        protein_grams: planToLoad.protein_grams || 150,
+        carbs_grams: planToLoad.carbs_grams || 200,
+        fat_grams: planToLoad.fat_grams || 70,
+        meals_per_day: planToLoad.meals_per_day || 4,
+        notes: planToLoad.notes || "",
       });
+
+      // Load meals with foods if available
+      if (fullEditingPlan?.meals && fullEditingPlan.meals.length > 0) {
+        loadMealsWithFoods(fullEditingPlan.meals);
+      }
     }
-  }, [editingPlan, open, form]);
+  }, [fullEditingPlan, editingPlan, open, form]);
+
+  // Function to load meals with their food items
+  const loadMealsWithFoods = async (planMeals: any[]) => {
+    try {
+      const mealIds = planMeals.map(m => m.id);
+      const foodItems = await api.get<any[]>(`/api/diet/meal-food-items?mealIds=${mealIds.join(',')}`);
+      
+      const foodItemsByMeal = foodItems.reduce<Record<string, any[]>>((acc, item) => {
+        if (!acc[item.meal_id]) acc[item.meal_id] = [];
+        acc[item.meal_id].push(item);
+        return acc;
+      }, {});
+
+      const loadedMeals: MealData[] = planMeals.map(meal => ({
+        name: meal.meal_name,
+        time: meal.time_suggestion || "",
+        notes: meal.notes || "",
+        foods: (foodItemsByMeal[meal.id] || []).map((item: any) => {
+          const food = item.food;
+          if (!food) return null;
+          return {
+            food: food,
+            quantity: item.quantity,
+            unit: item.unit,
+            calories: item.calculated_calories || 0,
+            protein: item.calculated_protein || 0,
+            carbs: item.calculated_carbs || 0,
+            fat: item.calculated_fat || 0,
+          };
+        }).filter(Boolean),
+      }));
+
+      setMeals(loadedMeals);
+    } catch (error) {
+      console.error('Failed to load meal foods:', error);
+    }
+  };
 
   const resetWizard = () => {
     setStep(1);
@@ -197,15 +246,16 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
     if (step > 1) setStep(step - 1);
   };
 
-  const addFoodToMeal = () => {
-    if (!selectedFood) return;
+  const addFoodToMeal = (foodToAdd?: Food) => {
+    const food = foodToAdd || selectedFood;
+    if (!food) return;
     
-    const nutrition = calculateNutrition(selectedFood, foodQuantity, foodUnit);
+    const nutrition = calculateNutrition(food, foodQuantity, foodUnit);
     
     setMeals(prev => {
       const newMeals = [...prev];
       newMeals[selectedMeal].foods.push({
-        food: selectedFood,
+        food: food,
         quantity: foodQuantity,
         unit: foodUnit,
         calories: nutrition.calories,
@@ -221,6 +271,26 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
     setFoodSearch("");
     setFoodQuantity(100);
     setFoodUnit("g");
+  };
+
+  const handleCustomFoodCreated = (food: Food) => {
+    // Add the custom food directly to the meal
+    const nutrition = calculateNutrition(food, food.default_serving_size || 100, food.default_serving_unit || "g");
+    setMeals(prev => {
+      const newMeals = [...prev];
+      newMeals[selectedMeal].foods.push({
+        food: food,
+        quantity: food.default_serving_size || 100,
+        unit: food.default_serving_unit || "g",
+        calories: nutrition.calories,
+        protein: nutrition.protein,
+        carbs: nutrition.carbs,
+        fat: nutrition.fat,
+      });
+      return newMeals;
+    });
+    setShowFoodPicker(false);
+    toast.success("Custom food added to meal");
   };
 
   const removeFoodFromMeal = (mealIdx: number, foodIdx: number) => {
@@ -590,14 +660,89 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
               {/* Step 3: Meals */}
               {step === 3 && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      Add foods to each meal. Current: {dayTotals.calories} kcal
-                    </p>
-                    <Badge variant={dayTotals.calories > 0 ? "default" : "secondary"}>
-                      P: {Math.round(dayTotals.protein)}g • C: {Math.round(dayTotals.carbs)}g • F: {Math.round(dayTotals.fat)}g
-                    </Badge>
-                  </div>
+                  {/* Macro Progress Section */}
+                  {(() => {
+                    const caloriesTarget = form.getValues("calories_target") || 2000;
+                    const proteinTarget = form.getValues("protein_grams") || 150;
+                    const carbsTarget = form.getValues("carbs_grams") || 200;
+                    const fatTarget = form.getValues("fat_grams") || 70;
+                    
+                    const calProgress = Math.min((dayTotals.calories / caloriesTarget) * 100, 100);
+                    const protProgress = Math.min((dayTotals.protein / proteinTarget) * 100, 100);
+                    const carbsProgress = Math.min((dayTotals.carbs / carbsTarget) * 100, 100);
+                    const fatProgress = Math.min((dayTotals.fat / fatTarget) * 100, 100);
+                    
+                    const calOverflow = dayTotals.calories > caloriesTarget;
+                    const protOverflow = dayTotals.protein > proteinTarget;
+                    const carbsOverflow = dayTotals.carbs > carbsTarget;
+                    const fatOverflow = dayTotals.fat > fatTarget;
+                    
+                    return (
+                      <Card className="bg-muted/30">
+                        <CardContent className="py-4">
+                          <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                            Progress toward daily targets
+                            {(calOverflow || protOverflow || carbsOverflow || fatOverflow) && (
+                              <Badge variant="destructive" className="text-xs gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                Exceeds target
+                              </Badge>
+                            )}
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="flex items-center gap-1">
+                                  <Flame className="w-3 h-3 text-orange-500" />
+                                  Calories
+                                </span>
+                                <span className={calOverflow ? "text-destructive font-medium" : ""}>
+                                  {dayTotals.calories} / {caloriesTarget}
+                                </span>
+                              </div>
+                              <Progress value={calProgress} className={`h-2 ${calOverflow ? "[&>div]:bg-destructive" : ""}`} />
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="flex items-center gap-1">
+                                  <Beef className="w-3 h-3 text-red-500" />
+                                  Protein
+                                </span>
+                                <span className={protOverflow ? "text-destructive font-medium" : ""}>
+                                  {Math.round(dayTotals.protein)}g / {proteinTarget}g
+                                </span>
+                              </div>
+                              <Progress value={protProgress} className={`h-2 ${protOverflow ? "[&>div]:bg-destructive" : ""}`} />
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="flex items-center gap-1">
+                                  <Wheat className="w-3 h-3 text-amber-500" />
+                                  Carbs
+                                </span>
+                                <span className={carbsOverflow ? "text-destructive font-medium" : ""}>
+                                  {Math.round(dayTotals.carbs)}g / {carbsTarget}g
+                                </span>
+                              </div>
+                              <Progress value={carbsProgress} className={`h-2 ${carbsOverflow ? "[&>div]:bg-destructive" : ""}`} />
+                            </div>
+                            <div>
+                              <div className="flex justify-between text-xs mb-1">
+                                <span className="flex items-center gap-1">
+                                  <Droplet className="w-3 h-3 text-yellow-500" />
+                                  Fat
+                                </span>
+                                <span className={fatOverflow ? "text-destructive font-medium" : ""}>
+                                  {Math.round(dayTotals.fat)}g / {fatTarget}g
+                                </span>
+                              </div>
+                              <Progress value={fatProgress} className={`h-2 ${fatOverflow ? "[&>div]:bg-destructive" : ""}`} />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
 
                   {/* Meal Tabs */}
                   <div className="flex gap-2 flex-wrap">
@@ -729,14 +874,36 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
                                       </Button>
                                     ))}
                                     {(!searchedFoods || searchedFoods.length === 0) && foodSearch.length >= 2 && (
-                                      <p className="text-sm text-muted-foreground text-center py-4">
-                                        No foods found
-                                      </p>
+                                      <div className="text-center py-4">
+                                        <p className="text-sm text-muted-foreground mb-3">
+                                          No foods found for "{foodSearch}"
+                                        </p>
+                                        <CustomFoodDialog
+                                          onFoodCreated={handleCustomFoodCreated}
+                                          trigger={
+                                            <Button variant="outline" size="sm" className="gap-1">
+                                              <Plus className="h-3 w-3" />
+                                              Add "{foodSearch}" as custom food
+                                            </Button>
+                                          }
+                                        />
+                                      </div>
                                     )}
                                     {foodSearch.length < 2 && (
-                                      <p className="text-sm text-muted-foreground text-center py-4">
-                                        Type at least 2 characters to search
-                                      </p>
+                                      <div className="text-center py-4">
+                                        <p className="text-sm text-muted-foreground mb-3">
+                                          Type at least 2 characters to search
+                                        </p>
+                                        <CustomFoodDialog
+                                          onFoodCreated={handleCustomFoodCreated}
+                                          trigger={
+                                            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
+                                              <Plus className="h-3 w-3 mr-1" />
+                                              Or add a custom food
+                                            </Button>
+                                          }
+                                        />
+                                      </div>
                                     )}
                                   </div>
                                 </ScrollArea>
@@ -810,7 +977,7 @@ export function DietPlanWizard({ open, onOpenChange, editingPlan }: Props) {
                                   <Button
                                     type="button"
                                     size="sm"
-                                    onClick={addFoodToMeal}
+                                    onClick={() => addFoodToMeal()}
                                   >
                                     Add
                                   </Button>
